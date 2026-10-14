@@ -38,13 +38,18 @@ public:
 
 	/** 벽 충돌 검사 반지름 (cm). 0이면 충돌 검사를 하지 않는다. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Locomotion")
-	float CollisionRadius = 0.f;
+	float CollisionRadius = 20.f;
+
+	/** true면 무릎 높이 소품(침대, 책상, 큰 큐브)에도 막힌다. 스테이지 진행 담당이 켠다 (인트로는 끔) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Locomotion")
+	bool bBlockLowObstacles = false;
 
 private:
 	void SetupInput(class APlayerController* PC);
 	void OnMoveAxis(const FInputActionValue& Value);
 	void OnMoveEnd(const FInputActionValue& Value);
 	float ReadRawStick(class APlayerController* PC) const;
+	void DisableTemplateTeleport(class APawn* Pawn);
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputMappingContext> LocomotionContext;
