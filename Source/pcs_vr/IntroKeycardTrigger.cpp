@@ -105,6 +105,11 @@ void UIntroKeycardTrigger::TriggerNow()
 	World->GetTimerManager().SetTimer(LevelHandle, this, &UIntroKeycardTrigger::OpenNextLevel, FMath::Max(FadeTime, 0.01f), false);
 }
 
+void UIntroKeycardTrigger::Interact_Implementation(AActor* Interactor)
+{
+	TriggerNow();
+}
+
 void UIntroKeycardTrigger::OpenNextLevel()
 {
 	UGameplayStatics::OpenLevel(this, NextLevelName);
