@@ -2,6 +2,7 @@
 
 #include "Camera/CameraComponent.h"
 #include "CollisionQueryParams.h"
+#include "Components/PrimitiveComponent.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -13,6 +14,9 @@
 #include "InputAction.h"
 #include "InputActionValue.h"
 #include "InputMappingContext.h"
+#include "PuzzleGrabbable.h"
+#include "PuzzleUtils.h"
+#include "UObject/UnrealType.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogVRLocomotion, Log, All);
 
@@ -54,6 +58,34 @@ bool UVRSmoothLocomotionSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 float UVRSmoothLocomotionSubsystem::ReadRawStick(APlayerController* PC) const
 {
 	return 0.f;
+}
+
+void UVRSmoothLocomotionSubsystem::DisableTemplateTeleport(APawn* Pawn)
+{
+	// 템플릿 VRPawn은 같은 IA_Move(오른쪽 스틱)로 텔레포트한다.
+	// OpenXR 때문에 입력을 가로챌 수 없어서, 매 프레임 끝에 "텔레포트 위치가 유효함" 값을 꺼 둔다.
+	// → 스틱을 놓을 때(Completed) 템플릿이 확인하는 값이 항상 false라서 텔레포트가 일어나지 않는다.
+	// (이 서브시스템의 Tick은 입력 처리와 폰 Tick보다 뒤에 실행됨)
+	if (const FBoolProperty* ValidProp = FindFProperty<FBoolProperty>(Pawn->GetClass(), TEXT("bValidTeleportLocation")))
+	{
+		ValidProp->SetPropertyValue_InContainer(Pawn, false);
+	}
+
+	// 텔레포트 궤적과 도착 표시도 숨긴다
+	if (USceneComponent* Arc = PuzzleUtils::FindPawnComponent(Pawn, TEXT("TeleportTraceNiagaraSystem")))
+	{
+		if (Arc->IsVisible())
+		{
+			Arc->SetVisibility(false, true);
+		}
+	}
+	if (const FObjectProperty* VisProp = FindFProperty<FObjectProperty>(Pawn->GetClass(), TEXT("TeleportVisualizerReference")))
+	{
+		if (AActor* Visualizer = Cast<AActor>(VisProp->GetObjectPropertyValue_InContainer(Pawn)))
+		{
+			Visualizer->SetActorHiddenInGame(true);
+		}
+	}
 }
 
 void UVRSmoothLocomotionSubsystem::SetupInput(APlayerController* PC)
@@ -111,6 +143,8 @@ void UVRSmoothLocomotionSubsystem::Tick(float DeltaTime)
 	{
 		SetupInput(PC);
 	}
+
+	DisableTemplateTeleport(Pawn);
 
 	const double Now = World->GetTimeSeconds();
 
@@ -180,24 +214,79 @@ void UVRSmoothLocomotionSubsystem::Tick(float DeltaTime)
 	}
 	const FRotator Yaw(0.f, Cam->GetComponentRotation().Yaw, 0.f);
 	const FVector Dir = FRotationMatrix(Yaw).GetUnitAxis(EAxis::X);
-	const FVector Delta = Dir * Axis * MoveSpeed * DeltaTime;
+	FVector Delta = Dir * Axis * MoveSpeed * DeltaTime;
 
-	// 이동 방향 앞쪽에 벽이 있으면 멈춘다
-	FHitResult Hit;
-	FCollisionQueryParams Params(SCENE_QUERY_STAT(VRLocomotion), false, Pawn);
-	const FVector Start = Cam->GetComponentLocation();
-	const FVector End = Start + Dir * FMath::Sign(Axis) * (CollisionRadius + Delta.Size());
-	// 벽 충돌 검사는 기본으로 꺼 둔다. (소품이 눈높이에 걸려 이동을 막는 문제가 있었음)
-	// 이후 스테이지에 벽 전용 충돌이 생기면 CollisionRadius > 0 으로 다시 켠다.
-	if (CollisionRadius > 0.f && World->SweepSingleByChannel(Hit, Start, End, FQuat::Identity, ECC_Visibility,
-		FCollisionShape::MakeSphere(CollisionRadius), Params) && Hit.bBlockingHit)
+	// 벽·문에 막히면 멈추고, 비스듬히 부딪히면 벽을 따라 미끄러진다.
+	// - 가슴 높이(바닥에서 최소 120cm, 구 아래쪽이 100cm라 인트로 상자 덮개에 안 걸림): 항상 검사 → 벽·문
+	// - 무릎 높이(45cm): bBlockLowObstacles일 때만 (L_01부터. 인트로는 택배 상자를 지나갈 수 있게 끔)
+	// 손에 들었거나 허리에 걸린 카드·큐브는 이동을 막지 않는다 (예전에 손에 든 소품이 이동을 막던 문제).
+	if (CollisionRadius > 0.f)
 	{
-		if (Now - LastLogTime > 1.0)
+		FCollisionObjectQueryParams Objects;
+		Objects.AddObjectTypesToQuery(ECC_WorldStatic);
+		Objects.AddObjectTypesToQuery(ECC_WorldDynamic);
+		Objects.AddObjectTypesToQuery(ECC_PhysicsBody);
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(VRLocomotion), false, Pawn);
+		const FCollisionShape Sphere = FCollisionShape::MakeSphere(CollisionRadius);
+		const FVector CamLoc = Cam->GetComponentLocation();
+		const float FloorZ = Pawn->GetActorLocation().Z;
+		TArray<FVector, TInlineAllocator<2>> Probes;
+		Probes.Add(FVector(CamLoc.X, CamLoc.Y, FMath::Max(FloorZ + 120.f, CamLoc.Z - 40.f)));
+		if (bBlockLowObstacles)
 		{
-			LastLogTime = Now;
-			UE_LOG(LogVRLocomotion, Log, TEXT("이동이 막힘: %s"), Hit.GetActor() ? *Hit.GetActor()->GetName() : TEXT("(액터 없음)"));
+			Probes.Add(FVector(CamLoc.X, CamLoc.Y, FloorZ + 45.f));
 		}
-		return;
+
+		auto IsBlocked = [&](const FVector& Move, FHitResult& OutHit)
+		{
+			for (const FVector& P : Probes)
+			{
+				TArray<FHitResult> Hits;
+				World->SweepMultiByObjectType(Hits, P, P + Move, FQuat::Identity, Objects, Sphere, Params);
+				for (const FHitResult& H : Hits)
+				{
+					// 트리거 박스처럼 겹침만 감지하는 영역은 통과 (플레이어를 실제로 막는 충돌만 벽으로 본다)
+					const UPrimitiveComponent* HitComp = H.GetComponent();
+					if (!HitComp || HitComp->GetCollisionResponseToChannel(ECC_Pawn) != ECR_Block)
+					{
+						continue;
+					}
+					const AActor* HitActor = H.GetActor();
+					const APuzzleGrabbable* Grabbable = Cast<APuzzleGrabbable>(HitActor);
+					if (Grabbable && (Grabbable->IsHeld() || Grabbable->IsHolstered()))
+					{
+						continue;
+					}
+					// 손에 붙어 있는 물건 (인트로 카드·지도 등 템플릿 GrabComponent로 잡은 것)
+					if (HitActor && (HitActor->GetAttachParentActor() == Pawn
+						|| PuzzleUtils::IsGrabComponentHeld(PuzzleUtils::FindGrabComponent(HitActor))))
+					{
+						continue;
+					}
+					OutHit = H;
+					return true;
+				}
+			}
+			return false;
+		};
+
+		FHitResult Hit;
+		if (IsBlocked(Delta, Hit))
+		{
+			const FVector WallNormal = FVector(Hit.ImpactNormal.X, Hit.ImpactNormal.Y, 0.f).GetSafeNormal();
+			const FVector Slide = FVector::VectorPlaneProject(Delta, WallNormal);
+			FHitResult SlideHit;
+			if (Slide.SizeSquared() < 0.01f || IsBlocked(Slide, SlideHit))
+			{
+				if (Now - LastLogTime > 1.0)
+				{
+					LastLogTime = Now;
+					UE_LOG(LogVRLocomotion, Log, TEXT("이동이 막힘: %s"), Hit.GetActor() ? *Hit.GetActor()->GetName() : TEXT("(액터 없음)"));
+				}
+				return;
+			}
+			Delta = Slide;
+		}
 	}
 
 	Pawn->AddActorWorldOffset(Delta, false);

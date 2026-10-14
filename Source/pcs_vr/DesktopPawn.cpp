@@ -128,8 +128,7 @@ void ADesktopPawn::PawnClientRestart()
 		return;
 	}
 
-	// VRPawn이 남긴 VR 입력 매핑은 지우고 데스크톱 매핑만 쓴다
-	Input->ClearAllMappings();
+	// 다른 서브시스템(VRInteractionSubsystem의 E 키 등)이 등록한 매핑은 그대로 두고 추가만 한다
 	Input->AddMappingContext(DesktopContext, 100);
 
 	PC->SetInputMode(FInputModeGameOnly());
