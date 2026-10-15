@@ -113,6 +113,12 @@ void APuzzleElevator::BeginPlay()
 	Display->InitWidget();
 	SetDisplay(TEXT("▼  대기 중…"), FLinearColor(1.f, 0.6f, 0.1f));
 	DoorAlpha = 0.f;
+
+	if (bArrivalOnly)
+	{
+		CallInteract->bInteractEnabled = false;
+		GetWorldTimerManager().SetTimer(LevelHandle, this, &APuzzleElevator::Arrive, FMath::Max(ArrivalDelay, 0.01f), false);
+	}
 }
 
 void APuzzleElevator::SetDisplay(const FString& Message, const FLinearColor& Color)
@@ -171,6 +177,10 @@ void APuzzleElevator::Tick(float DeltaTime)
 		break;
 
 	case EState::Open:
+		if (bArrivalOnly)
+		{
+			break;
+		}
 		InsideTime = IsPlayerInside() ? InsideTime + DeltaTime : 0.f;
 		if (InsideTime >= DepartDelay)
 		{

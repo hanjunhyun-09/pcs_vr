@@ -29,6 +29,16 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Elevator")
 	FName NextLevel = TEXT("/Game/VRPuzzle/Maps/L_02_Perspective");
 
+	/**
+	 * 도착용 엘리베이터 (이전 스테이지에서 타고 온 것처럼 보이게): 시작 후 ArrivalDelay초 뒤 문이 열리고,
+	 * 다시 들어가도 출발하지 않는다. 플레이어 시작 위치를 이 엘리베이터 안에 둔다.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Elevator")
+	bool bArrivalOnly = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Elevator", meta = (EditCondition = "bArrivalOnly"))
+	float ArrivalDelay = 1.5f;
+
 	/** 안에 들어간 뒤 문이 닫히기까지 기다리는 시간(초) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Elevator")
 	float DepartDelay = 1.5f;

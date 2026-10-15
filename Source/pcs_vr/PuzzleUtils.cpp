@@ -116,4 +116,25 @@ namespace PuzzleUtils
 		const FBoolProperty* HeldProp = FindFProperty<FBoolProperty>(GrabComp->GetClass(), TEXT("bIsHeld"));
 		return HeldProp && HeldProp->GetPropertyValue_InContainer(GrabComp);
 	}
+
+	void ReleaseGrabComponent(UActorComponent* GrabComp)
+	{
+		UFunction* Func = GrabComp ? GrabComp->FindFunction(TEXT("TryRelease")) : nullptr;
+		if (!Func)
+		{
+			return;
+		}
+		// 블루프린트 함수 인자/반환값 버퍼 (TryRelease는 인자 없이 bool 반환)
+		uint8* Params = static_cast<uint8*>(FMemory_Alloca(FMath::Max<int32>(Func->ParmsSize, 1)));
+		FMemory::Memzero(Params, Func->ParmsSize);
+		for (TFieldIterator<FProperty> It(Func); It && It->HasAnyPropertyFlags(CPF_Parm); ++It)
+		{
+			It->InitializeValue_InContainer(Params);
+		}
+		GrabComp->ProcessEvent(Func, Params);
+		for (TFieldIterator<FProperty> It(Func); It && It->HasAnyPropertyFlags(CPF_Parm); ++It)
+		{
+			It->DestroyValue_InContainer(Params);
+		}
+	}
 }

@@ -1,15 +1,21 @@
 #include "VRInteractionSubsystem.h"
 
+#include "CollisionQueryParams.h"
+#include "Components/SceneComponent.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "EnhancedPlayerInput.h"
+#include "EngineUtils.h"
+#include "HAL/IConsoleManager.h"
+#include "TimerManager.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 #include "InputAction.h"
 #include "InputCoreTypes.h"
 #include "InputMappingContext.h"
+#include "PerspectiveCube.h"
 #include "PuzzleInteractComponent.h"
 #include "PuzzleUtils.h"
 
@@ -41,6 +47,7 @@ void UVRInteractionSubsystem::Tick(float DeltaTime)
 	if (bInputReady)
 	{
 		UpdateTriggers();
+		UpdateRayGrab();
 		return;
 	}
 	UWorld* World = GetWorld();
@@ -82,16 +89,27 @@ void UVRInteractionSubsystem::SetupInput(APlayerController* PC)
 		}
 	}
 
-	// 데스크톱 테스트: E 키 (키보드는 OpenXR을 거치지 않아서 새 매핑으로 충분)
+	// 그립: 템플릿이 그립에 연결해 둔 액션 (IA_Grab_*: IMC_Default, IA_Hand_Grasp_*: IMC_Hands)
+	LeftGripActions = {
+		LoadObject<UInputAction>(nullptr, TEXT("/Game/VRTemplate/Input/Actions/IA_Grab_Left.IA_Grab_Left")),
+		LoadObject<UInputAction>(nullptr, TEXT("/Game/VRTemplate/Input/Actions/Hands/IA_Hand_Grasp_Left.IA_Hand_Grasp_Left")) };
+	RightGripActions = {
+		LoadObject<UInputAction>(nullptr, TEXT("/Game/VRTemplate/Input/Actions/IA_Grab_Right.IA_Grab_Right")),
+		LoadObject<UInputAction>(nullptr, TEXT("/Game/VRTemplate/Input/Actions/Hands/IA_Hand_Grasp_Right.IA_Hand_Grasp_Right")) };
+
+	// 데스크톱 테스트: E 키 / R 키 (키보드는 OpenXR을 거치지 않아서 새 매핑으로 충분)
 	DesktopAction = NewObject<UInputAction>(this, TEXT("IA_Puzzle_Interact_Desktop"));
+	DesktopRayAction = NewObject<UInputAction>(this, TEXT("IA_Puzzle_RayGrab_Desktop"));
 	Context = NewObject<UInputMappingContext>(this, TEXT("IMC_Puzzle_Interact"));
 	Context->MapKey(DesktopAction, EKeys::E);
+	Context->MapKey(DesktopRayAction, EKeys::R);
 	Input->AddMappingContext(Context, 5);
 	EIC->BindAction(DesktopAction, ETriggerEvent::Started, this, &UVRInteractionSubsystem::OnDesktopInteract);
+	EIC->BindAction(DesktopRayAction, ETriggerEvent::Started, this, &UVRInteractionSubsystem::OnDesktopRayGrab);
 
 	PlayerInput = Input->GetPlayerInput();
 	bInputReady = true;
-	UE_LOG(LogVRInteract, Log, TEXT("트리거 상호작용 입력 준비 완료 (템플릿 트리거 액션 읽기 / 데스크톱 E)"));
+	UE_LOG(LogVRInteract, Log, TEXT("트리거 상호작용 입력 준비 완료 (템플릿 트리거/그립 액션 읽기 / 데스크톱 E, R)"));
 }
 
 float UVRInteractionSubsystem::ReadTrigger(const TArray<TObjectPtr<UInputAction>>& Actions) const
@@ -227,3 +245,158 @@ void UVRInteractionSubsystem::OnDesktopInteract()
 		Best->Interact(PuzzleUtils::GetPlayerPawn(this));
 	}
 }
+
+// ---------------------------------------------------------------- 원근 큐브 레이 잡기
+
+void UVRInteractionSubsystem::UpdateRayGrab()
+{
+	UpdateRayHand(LeftRay, ReadTrigger(LeftGripActions));
+	UpdateRayHand(RightRay, ReadTrigger(RightGripActions));
+}
+
+void UVRInteractionSubsystem::UpdateRayHand(FRayHand& Hand, float GripValue)
+{
+	APawn* Pawn = PuzzleUtils::GetPlayerPawn(this);
+	USceneComponent* Aim = PuzzleUtils::FindPawnComponent(Pawn, Hand.AimName);
+	USceneComponent* Grip = PuzzleUtils::FindPawnComponent(Pawn, Hand.GripName);
+	if (!Aim || !Grip)
+	{
+		return;
+	}
+
+	// 그립을 놓으면 레이로 잡고 있던 큐브도 놓는다 (→ 시선 방향으로 투사되어 커질 수 있음)
+	if (Hand.bGripDown)
+	{
+		if (GripValue < 0.3f)
+		{
+			Hand.bGripDown = false;
+			if (APerspectiveCube* Cube = Hand.Held.Get())
+			{
+				Cube->EndRayGrab();
+			}
+			Hand.Held.Reset();
+		}
+		return;
+	}
+
+	// 겨누고 있는 큐브를 밝게 표시
+	APerspectiveCube* Target = TraceCube(Aim->GetComponentLocation(), Aim->GetForwardVector(), Grip->GetComponentLocation());
+	if (Hand.Aimed.Get() != Target)
+	{
+		if (APerspectiveCube* Old = Hand.Aimed.Get())
+		{
+			Old->SetAimHighlight(false);
+		}
+		if (Target)
+		{
+			Target->SetAimHighlight(true);
+		}
+		Hand.Aimed = Target;
+	}
+
+	if (GripValue > 0.7f)
+	{
+		Hand.bGripDown = true;
+		if (Target)
+		{
+			Hand.Aimed.Reset();
+			Target->BeginRayGrab(Grip, FVector::ZeroVector);
+			Hand.Held = Target;
+			UE_LOG(LogVRInteract, Log, TEXT("%s 그립 -> %s 레이로 잡기"), Hand.GripName, *Target->GetName());
+		}
+		else if (APerspectiveCube* Locked = TraceCube(Aim->GetComponentLocation(), Aim->GetForwardVector(), Grip->GetComponentLocation(), true))
+		{
+			// 아직 잡을 수 없는 큐브를 겨누고 그립 → 진행 담당이 안내 메모를 띄운다
+			Locked->NotifyRayGrabRefused();
+		}
+	}
+}
+
+APerspectiveCube* UVRInteractionSubsystem::TraceCube(const FVector& Start, const FVector& Dir, const FVector& MinDistFrom, bool bIncludeLocked) const
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return nullptr;
+	}
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(PuzzleRayGrab), false);
+	if (APawn* Pawn = PuzzleUtils::GetPlayerPawn(this))
+	{
+		Params.AddIgnoredActor(Pawn);
+	}
+	// 손떨림을 감안해 가는 구(반지름 4cm)로 쓸어 본다
+	FHitResult Hit;
+	if (!World->SweepSingleByChannel(Hit, Start, Start + Dir * RayGrabDistance, FQuat::Identity, ECC_Visibility, FCollisionShape::MakeSphere(4.f), Params))
+	{
+		return nullptr;
+	}
+	APerspectiveCube* Cube = Cast<APerspectiveCube>(Hit.GetActor());
+	const bool bGrabbable = Cube && (bIncludeLocked ? !Cube->IsHeld() : Cube->CanRayGrab());
+	if (!bGrabbable || FVector::Dist(Cube->GetActorLocation(), MinDistFrom) < MinRayGrabDistance)
+	{
+		return nullptr;
+	}
+	return Cube;
+}
+
+void UVRInteractionSubsystem::OnDesktopRayGrab()
+{
+	if (APerspectiveCube* Held = DesktopHeld.Get())
+	{
+		Held->EndRayGrab();
+		DesktopHeld.Reset();
+		UE_LOG(LogVRInteract, Log, TEXT("R 키 -> %s 놓기"), *Held->GetName());
+		return;
+	}
+	FVector ViewLoc;
+	FRotator ViewRot;
+	USceneComponent* Cam = PuzzleUtils::GetPlayerCamera(this);
+	if (!Cam || !PuzzleUtils::GetPlayerView(this, ViewLoc, ViewRot))
+	{
+		return;
+	}
+	if (APerspectiveCube* Cube = TraceCube(ViewLoc, ViewRot.Vector(), ViewLoc))
+	{
+		// 카메라 앞 60cm, 눈높이에 든다 (아래로 들면 헤드셋 없이 테스트할 때 카메라가 바닥 높이라 시선이 바로 바닥에 닿음)
+		Cube->BeginRayGrab(Cam, FVector(60.f, 0.f, 5.f));
+		DesktopHeld = Cube;
+		UE_LOG(LogVRInteract, Log, TEXT("R 키 -> %s 레이로 잡기"), *Cube->GetName());
+	}
+	else if (APerspectiveCube* Locked = TraceCube(ViewLoc, ViewRot.Vector(), ViewLoc, true))
+	{
+		Locked->NotifyRayGrabRefused();
+	}
+}
+
+// 헤드셋 없이 테스트: 콘솔에 pcs.RayGrabTest → 가장 가까운 원근 큐브를 카메라 앞으로 레이 잡기, 1.5초 뒤 놓기
+static FAutoConsoleCommandWithWorld GRayGrabTestCommand(
+	TEXT("pcs.RayGrabTest"),
+	TEXT("가장 가까운 원근 큐브를 카메라 앞으로 레이로 잡아 왔다가 1.5초 뒤 놓는다 (헤드셋 없이 테스트용)"),
+	FConsoleCommandWithWorldDelegate::CreateStatic([](UWorld* World)
+	{
+		USceneComponent* Cam = PuzzleUtils::GetPlayerCamera(World);
+		if (!World || !Cam)
+		{
+			UE_LOG(LogVRInteract, Warning, TEXT("pcs.RayGrabTest: 플레이어 카메라 없음"));
+			return;
+		}
+		APerspectiveCube* Nearest = nullptr;
+		float NearestDist = TNumericLimits<float>::Max();
+		for (TActorIterator<APerspectiveCube> It(World); It; ++It)
+		{
+			const float Dist = FVector::Dist(It->GetActorLocation(), Cam->GetComponentLocation());
+			if (It->CanRayGrab() && Dist < NearestDist)
+			{
+				Nearest = *It;
+				NearestDist = Dist;
+			}
+		}
+		if (!Nearest)
+		{
+			UE_LOG(LogVRInteract, Warning, TEXT("pcs.RayGrabTest: 잡을 원근 큐브 없음"));
+			return;
+		}
+		Nearest->BeginRayGrab(Cam, FVector(60.f, 0.f, 5.f));
+		FTimerHandle Handle;
+		World->GetTimerManager().SetTimer(Handle, FTimerDelegate::CreateWeakLambda(Nearest, [Nearest]() { Nearest->EndRayGrab(); }), 1.5f, false);
+	}));

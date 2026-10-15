@@ -35,4 +35,7 @@ namespace PuzzleUtils
 	/** VR 템플릿의 GrabComponent (블루프린트 클래스 GrabComponent_C) */
 	PCS_VR_API UActorComponent* FindGrabComponent(const AActor* Actor);
 	PCS_VR_API bool IsGrabComponentHeld(const UActorComponent* GrabComp);
+
+	/** GrabComponent의 TryRelease를 불러 손에서 강제로 놓게 한다 */
+	PCS_VR_API void ReleaseGrabComponent(UActorComponent* GrabComp);
 }

@@ -54,13 +54,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grabbable")
 	FVector GrabAssistExtent = FVector::ZeroVector;
 
+	/** 템플릿 GrabComponent로 잡혀 있는지 (자식 클래스가 다른 잡기 방식을 더할 수 있음) */
 	UFUNCTION(BlueprintPure, Category = "Grabbable")
-	bool IsHeld() const;
+	virtual bool IsHeld() const;
 
 	UFUNCTION(BlueprintPure, Category = "Grabbable")
 	bool IsHolstered() const { return bHolstered; }
 
 	UStaticMeshComponent* GetMesh() const { return Mesh; }
+	UActorComponent* GetGrabComponent() const { return GrabComp; }
 
 	virtual void Tick(float DeltaTime) override;
 
