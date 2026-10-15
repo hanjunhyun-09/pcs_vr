@@ -159,6 +159,8 @@ MI_WARN = ensure_mi("MI_VRP_Warning", solid, (0.8, 0.55, 0.05))
 
 BP_KEYCARD = ensure_grab_bp("BP_Keycard", unreal.PuzzleGrabbable, True)
 BP_PCUBE = ensure_grab_bp("BP_PerspectiveCube", unreal.PerspectiveCube, False)
+# 카드 리더기 외형 블루프린트 (Scripts/build_card_reader.py가 만든다)
+BP_READER = eal.load_blueprint_class("/Game/VRPuzzle/Blueprints/Props/BP_CardReader")
 
 # 노출 값은 인트로 맵과 똑같이 맞춘다
 unreal.EditorLoadingAndSavingUtils.load_map("/Game/VRPuzzle/Maps/L_00_Intro")
@@ -221,11 +223,9 @@ box("B_WallLeft", 210, 780, 130, 150, 0, H, MI_WALL)
 box("B_WallRight", 210, 780, 350, 370, 0, H, MI_WALL)
 
 # 격리실 가구: 침대 (서쪽 벽), 책상 (북쪽 벽)
-box("R_Bed", 960, 1160, -150, -60, 0, 45, MI_BED, folder="Props")
-box("R_BedSheet", 980, 1160, -148, -62, 45, 50, MI_SHEET, folder="Props")
-box("R_BedPillow", 1120, 1155, -140, -70, 50, 60, MI_SHEET, folder="Props")
-box("R_DeskTop", 1110, 1200, 120, 300, 70, 75, MI_DESK, folder="Props")
-box("R_DeskLegs", 1115, 1195, 125, 295, 0, 70, MI_TRIM, folder="Props")
+# (BP_Bed / BP_Desk는 Scripts/build_furniture.py가 만든다. 피벗 = 바닥 중앙)
+spawn(eal.load_blueprint_class("/Game/VRPuzzle/Blueprints/Props/BP_Bed"), V(1060, -105, 0), label="R_Bed", folder="Props")
+spawn(eal.load_blueprint_class("/Game/VRPuzzle/Blueprints/Props/BP_Desk"), V(1155, 210, 0), label="R_Desk", folder="Props")
 
 # ---------------------------------------------------------------- 조명 / 후처리
 point_light("V_Light", -150, 0, 265, 22)
@@ -254,7 +254,7 @@ room_entry.get_component_by_class(unreal.BoxComponent).set_editor_property("box_
 # ---------------------------------------------------------------- 퍼즐 부품
 # 0) 출입문 + 카드 리더기 (문 오른쪽, 높이 120cm)
 entrance_door = spawn(unreal.PuzzleDoor, V(0, 0, 0), label="S1_EntranceDoor", folder="Puzzle")
-entrance_reader = spawn(unreal.PuzzleCardReader, V(-10, 95, 120), yaw=180.0, label="S1_EntranceReader", folder="Puzzle")
+entrance_reader = spawn(BP_READER, V(-10, 95, 120), yaw=180.0, label="S1_EntranceReader", folder="Puzzle")
 entrance_reader.set_editor_property("accept_tag", "KeycardPlayer")
 entrance_reader.set_editor_property("accepted_message", unreal.Text("출입 승인 — 강한결 / 코어 측정팀"))
 entrance_reader.set_editor_property("denied_message", unreal.Text("인식 실패"))
@@ -277,7 +277,7 @@ lever = spawn(unreal.PuzzleLever, V(1050, 350, 120), yaw=-90.0, label="S1_PowerL
 
 # 3) 잠긴 문 + 리더기 + 봉쇄 해제 버튼
 exit_door = spawn(unreal.PuzzleDoor, V(790, 250, 0), label="S1_ExitDoor", folder="Puzzle")
-exit_reader = spawn(unreal.PuzzleCardReader, V(800, 160, 120), yaw=0.0, label="S1_ExitReader", folder="Puzzle")
+exit_reader = spawn(BP_READER, V(800, 160, 120), yaw=0.0, label="S1_ExitReader", folder="Puzzle")
 exit_reader.set_editor_property("accept_tag", "KeycardAdmin")
 exit_reader.set_editor_property("powered", False)
 exit_reader.set_editor_property("accepted_message", unreal.Text("관리자 승인 — 봉쇄 해제 버튼을 눌러 주십시오."))
