@@ -1,6 +1,7 @@
 #include "VRSmoothLocomotionSubsystem.h"
 
 #include "Camera/CameraComponent.h"
+#include "Camera/PlayerCameraManager.h"
 #include "CollisionQueryParams.h"
 #include "Components/PrimitiveComponent.h"
 #include "Engine/LocalPlayer.h"
@@ -14,6 +15,7 @@
 #include "InputAction.h"
 #include "InputActionValue.h"
 #include "InputMappingContext.h"
+#include "NavigationSystem.h"
 #include "PuzzleGrabbable.h"
 #include "PuzzleUtils.h"
 #include "UObject/UnrealType.h"
@@ -85,6 +87,158 @@ void UVRSmoothLocomotionSubsystem::DisableTemplateTeleport(APawn* Pawn)
 		{
 			Visualizer->SetActorHiddenInGame(true);
 		}
+	}
+}
+
+bool UVRSmoothLocomotionSubsystem::IsSolidForPawn(const UPrimitiveComponent* Comp, const AActor* Actor, const APawn* Pawn) const
+{
+	// 트리거 박스처럼 겹침만 감지하는 영역은 통과 (플레이어를 실제로 막는 충돌만 벽으로 본다)
+	if (!Comp || Comp->GetCollisionResponseToChannel(ECC_Pawn) != ECR_Block)
+	{
+		return false;
+	}
+	const APuzzleGrabbable* Grabbable = Cast<APuzzleGrabbable>(Actor);
+	if (Grabbable && (Grabbable->IsHeld() || Grabbable->IsHolstered()))
+	{
+		return false;
+	}
+	// 손에 붙어 있는 물건 (인트로 카드·지도 등 템플릿 GrabComponent로 잡은 것)
+	if (Actor && (Actor->GetAttachParentActor() == Pawn
+		|| PuzzleUtils::IsGrabComponentHeld(PuzzleUtils::FindGrabComponent(Actor))))
+	{
+		return false;
+	}
+	return true;
+}
+
+bool UVRSmoothLocomotionSubsystem::FindGround(const FVector2D& XY, float TopZ, float BottomZ, float Radius, const APawn* Pawn, float& OutZ) const
+{
+	FCollisionObjectQueryParams Objects;
+	Objects.AddObjectTypesToQuery(ECC_WorldStatic);
+	Objects.AddObjectTypesToQuery(ECC_WorldDynamic);
+	Objects.AddObjectTypesToQuery(ECC_PhysicsBody);
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(VRLocomotionGround), false, Pawn);
+
+	const FVector Start(XY.X, XY.Y, TopZ);
+	const FVector End(XY.X, XY.Y, BottomZ);
+	TArray<FHitResult> Hits;
+	if (Radius > 0.f)
+	{
+		GetWorld()->SweepMultiByObjectType(Hits, Start, End, FQuat::Identity, Objects, FCollisionShape::MakeSphere(Radius), Params);
+	}
+	else
+	{
+		GetWorld()->LineTraceMultiByObjectType(Hits, Start, End, Objects, Params);
+	}
+	for (const FHitResult& H : Hits)
+	{
+		// 시작부터 겹친 벽은 바닥이 아니다. 선으로 찾을 때는 비탈·옆면도 제외 (윗면만)
+		// (구로 훑을 때는 모서리에 걸쳐도 그 윗면으로 친다)
+		if (H.bStartPenetrating || (Radius <= 0.f && H.ImpactNormal.Z < 0.7f) || !IsSolidForPawn(H.GetComponent(), H.GetActor(), Pawn))
+		{
+			continue;
+		}
+		OutZ = H.ImpactPoint.Z;
+		return true;
+	}
+	return false;
+}
+
+bool UVRSmoothLocomotionSubsystem::HasNavMeshNear(const FVector& Point) const
+{
+	const UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	FNavLocation Out;
+	// NavMesh는 벽·모서리에서 에이전트 반경(35cm)만큼 떨어져 생기므로 옆으로 넉넉하게 찾는다
+	return Nav && Nav->ProjectPointToNavigation(Point, Out, FVector(60.f, 60.f, 60.f));
+}
+
+void UVRSmoothLocomotionSubsystem::FadeIn(APawn* Pawn) const
+{
+	const APlayerController* PC = Cast<APlayerController>(Pawn->GetController());
+	if (PC && PC->PlayerCameraManager)
+	{
+		PC->PlayerCameraManager->StartCameraFade(1.f, 0.f, 0.25f, FLinearColor::Black);
+	}
+}
+
+bool UVRSmoothLocomotionSubsystem::TryClimb(APawn* Pawn, const UCameraComponent* Cam, const FVector& Dir, const FHitResult& BlockHit)
+{
+	const FVector CamLoc = Cam->GetComponentLocation();
+	const float FloorZ = Pawn->GetActorLocation().Z;
+
+	// 막힌 면에서 40cm 안쪽 지점의 윗면 (선반·큐브 윗면은 모서리에서 조금 들어가야 NavMesh가 있다)
+	const FVector2D Land(BlockHit.ImpactPoint.X + Dir.X * 40.f, BlockHit.ImpactPoint.Y + Dir.Y * 40.f);
+	const AActor* Target = BlockHit.GetActor();
+	float TopZ = 0.f;
+	if (!FindGround(Land, FloorZ + MaxClimbHeight + 30.f, FloorZ + MinClimbHeight, 0.f, Pawn, TopZ)
+		|| TopZ - FloorZ < MinClimbHeight || TopZ - FloorZ > MaxClimbHeight)
+	{
+		const UPrimitiveComponent* Comp = BlockHit.GetComponent();
+		const float TargetRise = Comp ? Comp->Bounds.GetBox().Max.Z - FloorZ : 0.f;
+		UE_LOG(LogVRLocomotion, Log, TEXT("오르기 실패: %s 윗면 높이 %.0fcm (오를 수 있는 높이 %.0f~%.0fcm)"),
+			Target ? *Target->GetName() : TEXT("?"), TargetRise, MinClimbHeight, MaxClimbHeight);
+		return false;
+	}
+	const float Rise = TopZ - FloorZ;
+
+	// 올라선 자리에 설 공간이 있는지 (무릎~머리 높이)
+	FCollisionObjectQueryParams Objects;
+	Objects.AddObjectTypesToQuery(ECC_WorldStatic);
+	Objects.AddObjectTypesToQuery(ECC_WorldDynamic);
+	Objects.AddObjectTypesToQuery(ECC_PhysicsBody);
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(VRLocomotionClimb), false, Pawn);
+	TArray<FOverlapResult> Overlaps;
+	GetWorld()->OverlapMultiByObjectType(Overlaps, FVector(Land.X, Land.Y, TopZ + 100.f), FQuat::Identity, Objects,
+		FCollisionShape::MakeCapsule(CollisionRadius, 70.f), Params);
+	for (const FOverlapResult& O : Overlaps)
+	{
+		if (IsSolidForPawn(O.GetComponent(), O.GetActor(), Pawn))
+		{
+			UE_LOG(LogVRLocomotion, Log, TEXT("오르기 실패: 윗면에 설 공간이 없음 (%s)"), O.GetActor() ? *O.GetActor()->GetName() : TEXT("?"));
+			return false;
+		}
+	}
+
+	// 텔레포트로 갈 수 있는 곳(NavMesh)만: 1m 미만 큐브, 난간, 디스펜서 등에는 오르지 않는다
+	if (!HasNavMeshNear(FVector(Land.X, Land.Y, TopZ)))
+	{
+		UE_LOG(LogVRLocomotion, Log, TEXT("오르기 실패: %s 윗면에 NavMesh가 없음"), BlockHit.GetActor() ? *BlockHit.GetActor()->GetName() : TEXT("?"));
+		return false;
+	}
+
+	// 머리(카메라)가 착지 지점 위에 오도록 폰을 옮긴다
+	Pawn->AddActorWorldOffset(FVector(Land.X - CamLoc.X, Land.Y - CamLoc.Y, Rise), false);
+	FadeIn(Pawn);
+	UE_LOG(LogVRLocomotion, Log, TEXT("오르기: %s 위로 %.0fcm"), BlockHit.GetActor() ? *BlockHit.GetActor()->GetName() : TEXT("?"), Rise);
+	return true;
+}
+
+void UVRSmoothLocomotionSubsystem::FollowGround(APawn* Pawn, const UCameraComponent* Cam)
+{
+	const FVector CamLoc = Cam->GetComponentLocation();
+	const float FloorZ = Pawn->GetActorLocation().Z;
+
+	// 머리 아래를 반지름 15cm로 훑는다 (모서리에서 몸을 조금 내밀어도 바로 떨어지지 않게)
+	float GroundZ = 0.f;
+	if (!FindGround(FVector2D(CamLoc.X, CamLoc.Y), FloorZ + 30.f, FloorZ - 2000.f, 15.f, Pawn, GroundZ))
+	{
+		return;
+	}
+	const float Drop = FloorZ - GroundZ;
+	if (Drop < 3.f)
+	{
+		return;
+	}
+	// 갈 수 없는 곳(난간 너머 아래층 등)으로는 떨어지지 않는다
+	if (Drop > MinClimbHeight && !HasNavMeshNear(FVector(CamLoc.X, CamLoc.Y, GroundZ)))
+	{
+		return;
+	}
+	Pawn->AddActorWorldOffset(FVector(0.f, 0.f, -Drop), false);
+	if (Drop > MinClimbHeight)
+	{
+		FadeIn(Pawn);
+		UE_LOG(LogVRLocomotion, Log, TEXT("내려옴: %.0fcm"), Drop);
 	}
 }
 
@@ -201,17 +355,23 @@ void UVRSmoothLocomotionSubsystem::Tick(float DeltaTime)
 		UE_LOG(LogVRLocomotion, Log, TEXT("IA_Move 값: 이벤트=%.2f 직접읽기=%.2f"), EnhancedAxis, Polled);
 	}
 
-	if (FMath::Abs(Axis) < DeadZone)
-	{
-		return;
-	}
-	Axis = FMath::Sign(Axis) * (FMath::Abs(Axis) - DeadZone) / (1.f - DeadZone);
-
 	const UCameraComponent* Cam = Pawn->FindComponentByClass<UCameraComponent>();
 	if (!Cam)
 	{
 		return;
 	}
+	if (bAllowClimb)
+	{
+		FollowGround(Pawn, Cam);
+	}
+
+	if (FMath::Abs(Axis) < DeadZone)
+	{
+		ClimbHeldTime = 0.f;
+		return;
+	}
+	Axis = FMath::Sign(Axis) * (FMath::Abs(Axis) - DeadZone) / (1.f - DeadZone);
+
 	const FRotator Yaw(0.f, Cam->GetComponentRotation().Yaw, 0.f);
 	const FVector Dir = FRotationMatrix(Yaw).GetUnitAxis(EAxis::X);
 	FVector Delta = Dir * Axis * MoveSpeed * DeltaTime;
@@ -245,34 +405,37 @@ void UVRSmoothLocomotionSubsystem::Tick(float DeltaTime)
 				World->SweepMultiByObjectType(Hits, P, P + Move, FQuat::Identity, Objects, Sphere, Params);
 				for (const FHitResult& H : Hits)
 				{
-					// 트리거 박스처럼 겹침만 감지하는 영역은 통과 (플레이어를 실제로 막는 충돌만 벽으로 본다)
-					const UPrimitiveComponent* HitComp = H.GetComponent();
-					if (!HitComp || HitComp->GetCollisionResponseToChannel(ECC_Pawn) != ECR_Block)
+					if (IsSolidForPawn(H.GetComponent(), H.GetActor(), Pawn))
 					{
-						continue;
+						OutHit = H;
+						return true;
 					}
-					const AActor* HitActor = H.GetActor();
-					const APuzzleGrabbable* Grabbable = Cast<APuzzleGrabbable>(HitActor);
-					if (Grabbable && (Grabbable->IsHeld() || Grabbable->IsHolstered()))
-					{
-						continue;
-					}
-					// 손에 붙어 있는 물건 (인트로 카드·지도 등 템플릿 GrabComponent로 잡은 것)
-					if (HitActor && (HitActor->GetAttachParentActor() == Pawn
-						|| PuzzleUtils::IsGrabComponentHeld(PuzzleUtils::FindGrabComponent(HitActor))))
-					{
-						continue;
-					}
-					OutHit = H;
-					return true;
 				}
 			}
 			return false;
 		};
 
 		FHitResult Hit;
-		if (IsBlocked(Delta, Hit))
+		if (!IsBlocked(Delta, Hit))
 		{
+			ClimbHeldTime = 0.f;
+		}
+		else
+		{
+			// 앞으로 밀며 막혀 있으면 잠시 뒤 그 윗면으로 올라간다
+			if (bAllowClimb && Axis > 0.f)
+			{
+				ClimbHeldTime += DeltaTime;
+				if (ClimbHeldTime >= ClimbHoldTime)
+				{
+					ClimbHeldTime = 0.f;
+					if (TryClimb(Pawn, Cam, Dir, Hit))
+					{
+						return;
+					}
+				}
+			}
+
 			const FVector WallNormal = FVector(Hit.ImpactNormal.X, Hit.ImpactNormal.Y, 0.f).GetSafeNormal();
 			const FVector Slide = FVector::VectorPlaneProject(Delta, WallNormal);
 			FHitResult SlideHit;

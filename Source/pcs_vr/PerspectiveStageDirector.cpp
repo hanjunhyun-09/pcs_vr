@@ -21,7 +21,7 @@ APerspectiveStageDirector::APerspectiveStageDirector()
 
 	ArrivalMemo = FText::FromString(TEXT("통로 전원 스위치는 높은 선반 위에 있어."));
 	ShelfHintMemo = FText::FromString(TEXT("멀리 보고 놓으면 커져. 1층 엘리베이터 앞에서처럼."));
-	ClimbHintMemo = FText::FromString(TEXT("큰 큐브는 밟고 올라갈 수 있어.\n큐브 위로 텔레포트해 봐."));
+	ClimbHintMemo = FText::FromString(TEXT("큰 큐브는 밟고 올라갈 수 있어.\n큐브 앞에서 조이스틱을 앞으로 계속 밀어 봐."));
 	BoxHintMemo = FText::FromString(TEXT("가까이선 너무 커. 멀리서 보면 작아 보이지 않아?"));
 	PlateHintMemo = FText::FromString(TEXT("가벼운 건 안 돼. 크고 무거운 게 필요해."));
 	ClearMemo = FText::FromString(TEXT("그 노트, 네 글씨 맞지?\n넌 그날 이미 알고 있었어."));
@@ -35,6 +35,9 @@ void APerspectiveStageDirector::BeginPlay()
 	if (UVRSmoothLocomotionSubsystem* Locomotion = GetWorld()->GetSubsystem<UVRSmoothLocomotionSubsystem>())
 	{
 		Locomotion->bBlockLowObstacles = true;
+		Locomotion->bAllowClimb = true;   // 2-1: 큰 큐브를 밟고 선반 위로
+		// 큐브는 최대 8배(240cm)까지 쉽게 커진다 → 1m~2.4m 큐브 모두 오를 수 있고, 큐브에서 선반(3m)까지도 이어지게
+		Locomotion->MaxClimbHeight = 250.f;
 	}
 
 	// 통로 조명: 레벨에 넣어 둔 밝기를 기억하고 처음엔 끈다
