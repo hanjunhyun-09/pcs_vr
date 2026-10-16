@@ -30,6 +30,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dispenser", meta = (ClampMin = "5.0"))
 	float SpawnSize = 30.f;
 
+	/** 나오는 물체의 축별 비율 (1,1,1 = 정육면체). 3스테이지 도면 조각: (1, 1, 0.1) = 20cm x 20cm x 2cm 판 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dispenser")
+	FVector SpawnShape = FVector::OneVector;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dispenser")
 	FLinearColor SpawnColor = FLinearColor(0.1f, 0.35f, 0.9f);
 

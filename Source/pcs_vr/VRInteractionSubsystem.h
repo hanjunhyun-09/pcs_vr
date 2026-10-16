@@ -52,6 +52,9 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Interact|RayGrab")
 	float MinRayGrabDistance = 40.f;
 
+	/** 트리거를 끝까지 당기고 있는지 (키패드처럼 직접 손끝을 보는 부품이 쓴다) */
+	bool IsTriggerDown(bool bLeft) const { return bLeft ? bLeftDown : bRightDown; }
+
 private:
 	void SetupInput(APlayerController* PC);
 	void OnLeftTrigger();

@@ -45,6 +45,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Sign")
 	void SetSignText(const FText& NewText);
 
+	/** 글자 색만 바꾼다 (시점 맞추기 조각이 가까워질수록 밝아질 때 등) */
+	UFUNCTION(BlueprintCallable, Category = "Sign")
+	void SetSignColor(const FLinearColor& NewTextColor);
+
 	UFUNCTION(BlueprintCallable, Category = "Sign")
 	void SetSignVisible(bool bVisible);
 

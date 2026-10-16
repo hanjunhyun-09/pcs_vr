@@ -14,7 +14,7 @@ L_02_Perspective (2스테이지: 원근 실험실)를 만든다.
   B. 통로        x 1000~1020, y 0~250    (폭 2.5m, 높이 2.5m) 앞을 거대 상자(2.45m)가 막고 있음
   발코니         x 1000~1600, y 0~350    난간 110cm (y = 350)
   C. 아래층      x 1000~1600, y 350~1200 바닥 높이 -200, 압력판 (1350, 1000)
-  출구 복도      x 1620~2220, y 100~300  끝에 관측실 보안문 (L_03 준비 중)
+  출구 복도      x 1620~2220, y 100~300  끝에 관측실 보안문 (지나가면 L_03으로)
   도착 엘리베이터 x -224~0,   y 200~400  (서쪽 벽, 문 = x 0)
 """
 import unreal
@@ -325,7 +325,16 @@ box("Exit_Floor", 1600, 2240, 100, 300, -10, 0, MI_FLOOR, folder="Geometry/Exit"
 box("Exit_Ceiling", 1600, 2240, 80, 320, 300, 310, MI_CEIL, folder="Geometry/Exit")
 box("Exit_WallLeft", 1620, 2240, 80, 100, 0, 300, MI_WALL, folder="Geometry/Exit")
 box("Exit_WallRight", 1620, 2240, 300, 320, 0, 300, MI_WALL, folder="Geometry/Exit")
-box("Exit_WallEnd", 2220, 2240, 100, 300, 0, 300, MI_WALL, folder="Geometry/Exit")
+# 끝 벽: 관측실 보안문 자리 y 140~260 (높이 220)
+box("Exit_WallEnd_1", 2220, 2240, 100, 140, 0, 300, MI_WALL, folder="Geometry/Exit")
+box("Exit_WallEnd_2", 2220, 2240, 260, 300, 0, 300, MI_WALL, folder="Geometry/Exit")
+box("Exit_WallEnd_Header", 2220, 2240, 140, 260, 220, 300, MI_WALL, folder="Geometry/Exit")
+# 보안문 너머 짧은 통로 (여기 들어서면 L_03으로 넘어감)
+box("Gate_Floor", 2240, 2460, 100, 300, -10, 0, MI_FLOOR, folder="Geometry/Exit")
+box("Gate_Ceiling", 2240, 2460, 80, 320, 300, 310, MI_CEIL, folder="Geometry/Exit")
+box("Gate_WallLeft", 2240, 2460, 80, 100, 0, 300, MI_WALL, folder="Geometry/Exit")
+box("Gate_WallRight", 2240, 2460, 300, 320, 0, 300, MI_WALL, folder="Geometry/Exit")
+box("Gate_WallEnd", 2440, 2460, 100, 300, 0, 300, MI_WALL, folder="Geometry/Exit")
 
 # ---------------------------------------------------------------- 조명 / 후처리
 point_light("A_Light_1", 250, 300, 560, 70, radius=1200)
@@ -388,10 +397,13 @@ dispenser_c.set_editor_property("spawn_max_scale", 10.0)
 dispenser_c.set_editor_property("spawn_tags", ["MetalBox"])
 dispenser_c.set_editor_property("replace_actor", giant)
 
-# 출구 문 (발코니 동쪽 벽) + 관측실 보안문 (L_03 준비 중이라 닫힌 채)
+# 출구 문 (발코니 동쪽 벽) + 관측실 보안문 (가까이 가면 열리고, 지나가면 L_03으로)
 exit_door = spawn(unreal.PuzzleDoor, V(1610, 200, 0), label="S2_ExitDoor", folder="Puzzle")
-observation_door = spawn(unreal.PuzzleDoor, V(2210, 200, 0), label="S2_ObservationDoor", folder="Puzzle")
+observation_door = spawn(unreal.PuzzleDoor, V(2230, 200, 0), label="S2_ObservationDoor", folder="Puzzle")
 observation_door.set_editor_property("door_color", unreal.LinearColor(0.2, 0.22, 0.25, 1.0))
+gate = spawn(unreal.PuzzleStageGate, V(2230, 200, 0), label="S2_StageGate", folder="Navigation")
+gate.set_editor_property("next_level", "/Game/VRPuzzle/Maps/L_03_Observation")
+gate.set_editor_property("door", observation_door)
 
 # ---------------------------------------------------------------- 글자 (대사 초안 그대로)
 sign("S2_Sign_Title", "2. 원근 실험실\n착시 측정 연구소",
@@ -410,7 +422,7 @@ sign("S2_Sign_ShelfArrow", "↑  선반 위: 통로 전원 스위치", 650, 999,
 sign("S2_Sign_Plate", "압력판  ·  필요 무게 ≥ 3", 1350, 1199, 0, yaw=-90.0, size=(1200, 200), font=80, bg=(0.85, 0.5, 0.05, 1.0))
 sign("S2_Sign_DispenserA", "큐브 디스펜서", 160, 1, 140, yaw=90.0, size=(360, 80), font=28, bg=(0.15, 0.15, 0.15, 1.0), text_color=(0.6, 0.85, 1.0))
 sign("S2_Sign_DispenserC", "금속 상자 디스펜서", 1560, 1, 140, yaw=90.0, size=(420, 80), font=28, bg=(0.15, 0.15, 0.15, 1.0), text_color=(0.85, 0.85, 0.9))
-sign("S2_Sign_Observation", "3. 관측실\n(보안문 — 준비 중)", 2219, 200, 260, yaw=180.0, size=(500, 160), font=34, bg=(0.2, 0.22, 0.25, 1.0), text_color=(0.9, 0.9, 0.85))
+sign("S2_Sign_Observation", "3. 관측실", 2219, 200, 260, yaw=180.0, size=(500, 160), font=34, bg=(0.2, 0.22, 0.25, 1.0), text_color=(0.9, 0.9, 0.85))
 
 # ---------------------------------------------------------------- 진행 담당
 director = spawn(unreal.PerspectiveStageDirector, V(0, 0, 400), label="S2_StageDirector", folder="Puzzle")

@@ -91,8 +91,8 @@ APerspectiveCube* APuzzleDispenser::Dispense()
 	}
 	ReplaceActor = nullptr;
 
-	const FVector Loc = GetActorTransform().TransformPosition(FVector(0.f, 0.f, PedestalHeight + 2.f + SpawnSize * 0.5f));
-	const FTransform SpawnTM(GetActorRotation(), Loc, FVector(SpawnSize / 100.f));
+	const FVector Loc = GetActorTransform().TransformPosition(FVector(0.f, 0.f, PedestalHeight + 2.f + SpawnSize * SpawnShape.Z * 0.5f));
+	const FTransform SpawnTM(GetActorRotation(), Loc, FVector(SpawnSize / 100.f) * SpawnShape);
 	APerspectiveCube* Cube = GetWorld()->SpawnActorDeferred<APerspectiveCube>(SpawnClass, SpawnTM, this, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 	if (!Cube)
 	{

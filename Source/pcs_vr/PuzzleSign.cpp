@@ -55,6 +55,15 @@ void APuzzleSign::SetSignText(const FText& NewText)
 	}
 }
 
+void APuzzleSign::SetSignColor(const FLinearColor& NewTextColor)
+{
+	TextColor = NewTextColor;
+	if (UPuzzleTextWidget* W = GetTextWidget())
+	{
+		W->SetContent(Text, FontSize, TextColor, BackgroundColor);
+	}
+}
+
 void APuzzleSign::SetSignVisible(bool bVisible)
 {
 	Widget->SetVisibility(bVisible, true);
