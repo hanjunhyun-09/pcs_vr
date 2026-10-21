@@ -7,17 +7,27 @@
 
 class APuzzleToggleTarget;
 class UMaterialInstanceDynamic;
+class USoundBase;
+class UStaticMesh;
 class UStaticMeshComponent;
 class UWidgetComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FHandDeviceSymbolEvent, int32, SymbolIndex);
 
 /**
- * 손에 붙는 장치 + 책상 위 거치대 (노션 "4스테이지 퍼즐 설계", Statik 참고).
- * 액터 위치 = 거치대 바닥 가운데, 앞(+X) = 플레이어가 서는 쪽. 거치대 두 칸 중 플레이어 왼쪽(+Y)이 왼손 칸.
- * - 장착: VR은 두 손을 거치대 칸에 넣으면, 데스크톱은 거치대를 보고 E 키 → 장치가 손(데스크톱은 카메라)에 붙는다
- * - 왼손 트리거(데스크톱 Q) = 다이얼 한 칸 (● ▲ ■ ◆), 오른손 트리거(데스크톱 E) = Targets[다이얼]을 켜고 끔
- * - 마지막 입력 4번이 Solution과 같으면 장치가 풀려 거치대로 돌아가고 안쪽 각인이 보인다
+ * 양손을 넣고 들고 다니는 피험 장치 상자 + 책상 위 받침대 (노션 "4스테이지 퍼즐 설계", Statik 참고).
+ * Statik처럼 두 손이 상자 하나에 갇혀 손이 보이지 않고, 눈앞의 상자에 달린 다이얼·버튼·창만 보면서 규칙을 알아낸다.
+ * 액터 위치 = 받침대 바닥 가운데, 앞(+X) = 플레이어가 서는 쪽.
+ *
+ * 장치 상자 (로컬 +X = 플레이어에게서 먼 쪽, +Z = 위, +Y = 오른손 쪽):
+ *  - 뒷면(플레이어 쪽)에 손을 넣는 고무 소매 두 개
+ *  - 윗면 왼쪽: 다이얼 (돌아가는 원판 + 둘레의 기호 ● ▲ ■ ◆), 가운데: 기호 창, 오른쪽: 큰 빨간 버튼
+ *  - 윗면 뒤쪽(플레이어 쪽) 가장자리: 진행 램프 4개
+ *
+ * - 장착: VR은 두 손을 받침대 위 상자의 소매에 넣으면, 데스크톱은 받침대를 보고 E 키
+ *   → 상자가 두 손 사이에 떠서 손을 따라다니고, 손 모델은 숨는다 (상자 안에 있으니까)
+ * - 왼손 트리거(데스크톱 Q) = 다이얼 한 칸, 오른손 트리거(데스크톱 E) = 버튼 → Targets[다이얼]을 켜고 끔
+ * - 마지막 입력 4번이 Solution과 같으면 장치가 풀려 받침대로 돌아가고 각인이 보인다
  * 장착 중에는 트리거가 이 장치로만 가고, 원근 큐브 레이 잡기도 막힌다 (UVRInteractionSubsystem).
  * 5스테이지 장치 구역에서는 Targets를 제어판 램프로, Solution만 바꿔서 그대로 쓴다.
  */
@@ -29,7 +39,7 @@ class PCS_VR_API APuzzleHandDevice : public AActor
 public:
 	APuzzleHandDevice();
 
-	/** 다이얼 순서대로 (0 ● / 1 ▲ / 2 ■ / 3 ◆) 오른손 버튼이 켜고 끄는 장비 */
+	/** 다이얼 순서대로 (0 ● / 1 ▲ / 2 ■ / 3 ◆) 버튼이 켜고 끄는 장비 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HandDevice")
 	TArray<TObjectPtr<APuzzleToggleTarget>> Targets;
 
@@ -37,25 +47,41 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HandDevice")
 	TArray<int32> Solution = { 1, 0, 3, 2 };
 
-	/** 맞는 순서가 이어지면 오른손 표시창에 점이 하나씩 찬다 (노션: 선택, 난이도 낮추기) */
+	/** 맞는 순서가 이어지면 진행 램프가 하나씩 켜진다 (노션: 선택, 난이도 낮추기) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HandDevice")
 	bool bShowProgress = true;
 
-	/** 풀린 뒤 보이는 장치 안쪽 각인 */
+	/** 상자 윗면 이름판 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HandDevice")
+	FText Nameplate;
+
+	/** 풀린 뒤 받침대에 보이는 각인 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HandDevice", meta = (MultiLine = "true"))
 	FText Engraving;
 
-	/** 손(Grip)이 거치대 칸 가운데에서 이 거리(cm) 안에 들어오면 칸에 넣은 것으로 본다 */
+	/** 손(Grip)이 소매 입구에서 이 거리(cm) 안에 들어오면 손을 넣은 것으로 본다 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HandDevice")
-	float CradleRadius = 20.f;
+	float SleeveRadius = 16.f;
 
-	/** VR: 손(Grip) 기준 장치 위치. 손목 위에 오게 뒤로 조금 */
+	/** VR: 두 손 가운데 기준 상자 위치 (상자 좌표). 손이 상자 안쪽에 오게 앞으로 조금 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HandDevice")
-	FVector VRHandOffset = FVector(-9.f, 0.f, 3.f);
+	FVector VRCenterOffset = FVector(4.f, 0.f, 2.f);
 
-	/** 데스크톱: 카메라 기준 장치 위치 (왼손. 오른손은 Y만 반대) */
+	/** 데스크톱: 카메라 기준 상자 위치와 기울기 (윗면이 보이게 앞쪽을 들어 올림) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HandDevice")
-	FVector DesktopOffset = FVector(40.f, -15.f, -14.f);
+	FVector DesktopOffset = FVector(42.f, 0.f, -24.f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HandDevice")
+	FRotator DesktopRotation = FRotator(40.f, 0.f, 0.f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HandDevice|Sound")
+	TSoftObjectPtr<USoundBase> LockSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HandDevice|Sound")
+	TSoftObjectPtr<USoundBase> DialSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HandDevice|Sound")
+	TSoftObjectPtr<USoundBase> ButtonSound;
 
 	UPROPERTY(BlueprintAssignable, Category = "HandDevice")
 	FPuzzleSimpleEvent OnEquipped;
@@ -63,7 +89,7 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "HandDevice")
 	FHandDeviceSymbolEvent OnDialChanged;
 
-	/** 오른손 버튼을 눌렀을 때 (다이얼이 가리키던 기호) */
+	/** 버튼을 눌렀을 때 (다이얼이 가리키던 기호) */
 	UPROPERTY(BlueprintAssignable, Category = "HandDevice")
 	FHandDeviceSymbolEvent OnPressed;
 
@@ -77,7 +103,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "HandDevice")
 	void PressLeft();
 
-	/** 오른손: 지금 다이얼의 장비를 켜고 끔 + 입력 기록 */
+	/** 오른손: 버튼 → 지금 다이얼의 장비를 켜고 끔 + 입력 기록 */
 	UFUNCTION(BlueprintCallable, Category = "HandDevice")
 	void PressRight();
 
@@ -104,52 +130,69 @@ private:
 	void HandleRackInteract(AActor* InteractInstigator);
 
 	void Unlock();
-	void AttachDevices();
+	void FollowHands(float DeltaTime);
 	void ReturnToRack();
-	bool AreHandsInCradles() const;
+	void SetHandsHidden(bool bHide);
+	void Buzz(bool bLeft, float Amplitude);
+	void PlaySound(const TSoftObjectPtr<USoundBase>& Sound, float Volume = 1.f);
+	bool AreHandsInSleeves() const;
 	int32 CountProgress() const;
 	void UpdateDisplays();
-	UStaticMeshComponent* AddBox(const TCHAR* Name, USceneComponent* Parent, const FVector& Center, const FVector& SizeCm);
+
+	UStaticMeshComponent* AddPart(const TCHAR* Name, USceneComponent* Parent, UStaticMesh* Mesh, const FVector& Center, const FVector& SizeCm,
+		const FRotator& Rotation = FRotator::ZeroRotator);
 	UWidgetComponent* AddDisplay(const TCHAR* Name, USceneComponent* Parent, const FVector& Location, const FVector2D& DrawSize, float Scale);
 
 	UPROPERTY(VisibleAnywhere, Category = "HandDevice")
 	TObjectPtr<USceneComponent> Root;
 
 	UPROPERTY(VisibleAnywhere, Category = "HandDevice")
-	TArray<TObjectPtr<UStaticMeshComponent>> RackParts;
-
-	UPROPERTY(VisibleAnywhere, Category = "HandDevice")
 	TObjectPtr<UPuzzleInteractComponent> RackInteract;
 
+	/** 들고 다니는 상자 전체 (장착하면 월드 좌표로 손을 따라감) */
 	UPROPERTY(VisibleAnywhere, Category = "HandDevice")
-	TObjectPtr<USceneComponent> LeftDevice;
+	TObjectPtr<USceneComponent> Box;
 
 	UPROPERTY(VisibleAnywhere, Category = "HandDevice")
-	TObjectPtr<USceneComponent> RightDevice;
+	TObjectPtr<USceneComponent> DialPivot;
 
 	UPROPERTY(VisibleAnywhere, Category = "HandDevice")
-	TArray<TObjectPtr<UStaticMeshComponent>> DeviceParts;
+	TObjectPtr<UStaticMeshComponent> ButtonCap;
 
 	UPROPERTY(VisibleAnywhere, Category = "HandDevice")
-	TObjectPtr<UStaticMeshComponent> RightButton;
+	TArray<TObjectPtr<UStaticMeshComponent>> ProgressLamps;
 
 	UPROPERTY(VisibleAnywhere, Category = "HandDevice")
-	TObjectPtr<UWidgetComponent> DialDisplay;
+	TObjectPtr<UWidgetComponent> SymbolWindow;
 
 	UPROPERTY(VisibleAnywhere, Category = "HandDevice")
-	TObjectPtr<UWidgetComponent> ProgressDisplay;
+	TObjectPtr<UWidgetComponent> NameplateDisplay;
+
+	UPROPERTY(VisibleAnywhere, Category = "HandDevice")
+	TArray<TObjectPtr<UWidgetComponent>> DialLabels;
 
 	UPROPERTY(VisibleAnywhere, Category = "HandDevice")
 	TObjectPtr<UWidgetComponent> EngravingDisplay;
 
+	/** 색을 칠할 부품들 (BeginPlay에서 이름별로 색을 정함) */
+	UPROPERTY()
+	TArray<TObjectPtr<UStaticMeshComponent>> Parts;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> LampMIDs;
+
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> ButtonMID;
 
-	FTransform LeftRestTM;
-	FTransform RightRestTM;
+	TArray<TWeakObjectPtr<USceneComponent>> HiddenHands;
+	FTransform BoxRestTM;
+	FTransform SmoothedTM;
 	TArray<int32> History;
 	int32 DialIndex = 0;
-	float ButtonFlash = 0.f;
+	float DialAngle = 0.f;
+	float ButtonPress = 0.f;
+	float LampFlash = 0.f;
+	bool bHasSmoothed = false;
 	bool bEquipped = false;
 	bool bUnlocked = false;
 };

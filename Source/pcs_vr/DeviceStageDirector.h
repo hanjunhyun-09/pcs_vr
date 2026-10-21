@@ -76,6 +76,10 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Stage4|Refs")
 	TObjectPtr<APuzzleElevator> ExitElevator;
 
+	/** 피험자를 찍던 관찰 카메라의 빨간 녹화 표시등 (20년째 깜빡임, Statik의 '누가 보고 있다' 느낌) */
+	UPROPERTY(EditAnywhere, Category = "Stage4|Refs")
+	TArray<TObjectPtr<AActor>> RecLamps;
+
 	// ---- 안내 / 막힘 방지 ----
 	UPROPERTY(EditAnywhere, Category = "Stage4|Hints")
 	float IdleHintDelay = 60.f;
@@ -141,6 +145,7 @@ private:
 	float IdleTime = 0.f;
 	float EquippedTime = 0.f;
 	float MonitorDays = 7305.f;
+	float RecBlinkTime = 0.f;
 	bool bEquipped = false;
 	bool bPapersBlown = false;
 	bool bHiddenSeen = false;

@@ -64,6 +64,9 @@ def ensure_mi(name, parent, color):
     path = MAT_DIR + "/" + name
     if eal.does_asset_exist(path):
         mi = unreal.load_asset(path)
+        parent_now = mi.get_editor_property("parent")
+        if parent_now and parent_now.get_name() == "M_VRP_Surface":
+            return mi   # setup_grime_materials.py가 실제 질감 + 때로 바꾼 MI는 그대로 둔다
     else:
         mi = at.create_asset(name, MAT_DIR, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
         mi.set_editor_property("parent", parent)

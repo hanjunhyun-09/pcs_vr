@@ -1,5 +1,6 @@
 #include "DeviceStageDirector.h"
 
+#include "DebugShots.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/Pawn.h"
@@ -90,6 +91,16 @@ void ADeviceStageDirector::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 	UpdatePapers(DeltaTime);
+
+	RecBlinkTime += DeltaTime;
+	const bool bRecOn = FMath::Fmod(RecBlinkTime, 1.2f) < 0.6f;
+	for (AActor* Lamp : RecLamps)
+	{
+		if (Lamp && Lamp->IsHidden() == bRecOn)
+		{
+			Lamp->SetActorHiddenInGame(!bRecOn);
+		}
+	}
 
 	if (Monitor && Monitor->IsOn())
 	{
@@ -390,9 +401,9 @@ static FAutoConsoleCommandWithWorld GStage4TestCommand(
 	{
 		for (TActorIterator<ADeviceStageDirector> It(World); It; ++It)
 		{
-			// -ExecCmds로 시작하자마자 부를 때 플레이어가 아직 없을 수 있어서 잠깐 기다렸다가 시작
-			FTimerHandle Handle;
-			World->GetTimerManager().SetTimer(Handle, FTimerDelegate::CreateWeakLambda(*It, [Director = *It]() { Director->RunSelfTest(); }), 2.f, false);
+			// -ExecCmds로 시작하자마자 부를 때 플레이어가 아직 없고 셰이더도 컴파일 중일 수 있어서, 준비된 뒤 시작
+			TWeakObjectPtr<ADeviceStageDirector> Director = *It;
+			DebugShots::WhenReady(World, [Director]() { if (Director.IsValid()) { Director->RunSelfTest(); } });
 			return;
 		}
 		UE_LOG(LogStage4, Warning, TEXT("pcs.Stage4Test: 이 맵에 4스테이지 진행 담당이 없음"));
