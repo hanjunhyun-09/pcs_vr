@@ -146,7 +146,14 @@ void APuzzleElevator::Arrive()
 	}
 	UE_LOG(LogElevator, Log, TEXT("엘리베이터 도착"));
 	State = EState::Opening;
-	SetDisplay(TEXT("도착"), FLinearColor(0.3f, 1.f, 0.4f));
+	if (bOutOfService)
+	{
+		SetDisplay(TEXT("도착 · 운행 준비 중"), FLinearColor(1.f, 0.6f, 0.1f));
+	}
+	else
+	{
+		SetDisplay(TEXT("도착"), FLinearColor(0.3f, 1.f, 0.4f));
+	}
 	OnArrived.Broadcast();
 }
 
@@ -177,7 +184,7 @@ void APuzzleElevator::Tick(float DeltaTime)
 		break;
 
 	case EState::Open:
-		if (bArrivalOnly)
+		if (bArrivalOnly || bOutOfService)
 		{
 			break;
 		}

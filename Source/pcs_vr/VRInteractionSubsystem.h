@@ -5,6 +5,7 @@
 #include "VRInteractionSubsystem.generated.h"
 
 class APerspectiveCube;
+class APuzzleHandDevice;
 class APlayerController;
 class UInputAction;
 class UInputMappingContext;
@@ -23,6 +24,8 @@ class UPuzzleInteractComponent;
  *   손 바로 옆(MinRayGrabDistance 이내)의 큐브는 템플릿의 일반 잡기에 맡긴다.
  *   그립 값은 템플릿의 IA_Grab_* / IA_Hand_Grasp_* 액션에서 읽는다 (트리거와 같은 이유).
  * - 데스크톱 테스트: R 키 → 시선 레이로 잡기 / 다시 R → 놓기
+ *
+ * 손 장치(APuzzleHandDevice)를 찬 동안: 왼손/오른손 트리거 = 장치 다이얼/작동 (데스크톱 Q / E)
  */
 UCLASS()
 class PCS_VR_API UVRInteractionSubsystem : public UTickableWorldSubsystem
@@ -55,11 +58,19 @@ public:
 	/** 트리거를 끝까지 당기고 있는지 (키패드처럼 직접 손끝을 보는 부품이 쓴다) */
 	bool IsTriggerDown(bool bLeft) const { return bLeft ? bLeftDown : bRightDown; }
 
+	/**
+	 * 손 장치를 찬 동안: 트리거(데스크톱 Q / E)는 장치로만 가고, 원근 큐브 레이 잡기는 막힌다.
+	 * nullptr이면 원래대로 돌아간다.
+	 */
+	void SetActiveDevice(APuzzleHandDevice* Device);
+	APuzzleHandDevice* GetActiveDevice() const { return ActiveDevice.Get(); }
+
 private:
 	void SetupInput(APlayerController* PC);
 	void OnLeftTrigger();
 	void OnRightTrigger();
 	void OnDesktopInteract();
+	void OnDesktopDeviceLeft();
 	void InteractWithHand(const TCHAR* GripName);
 
 	UPROPERTY(Transient)
@@ -105,6 +116,10 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> DesktopAction;
 
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> DesktopDeviceLeftAction;
+
+	TWeakObjectPtr<APuzzleHandDevice> ActiveDevice;
 	TWeakObjectPtr<UEnhancedPlayerInput> PlayerInput;
 	TArray<TWeakObjectPtr<UPuzzleInteractComponent>> Interactables;
 	bool bInputReady = false;

@@ -16,7 +16,7 @@ L_03_Observation (3스테이지: 관측실)를 만든다.
   앞방          x 0~600,     y 0~800    발자국(250, 400) → 셔터 쪽을 보면 "코어를 보지 마 / 1114"
   셔터 칸막이    x 600~620   셔터 y 340~460, 키패드 (600, 520, 120)
   안쪽 관측 구역  x 620~1400,  y 0~800    눈금 선 교차점(820, 250) → 파이프 원 / 동쪽 벽 도면(빈 칸 y 500~600, z 180~280)
-  출구 복도      x 1420~2020, y 60~260   끝에 장치 시험실 보안문 (L_04 준비 중이라 잠김)
+  출구 복도      x 1420~2020, y 60~260   끝에 장치 시험실 보안문 → 지나가면 L_04_Device
 """
 import math
 import random
@@ -211,7 +211,15 @@ box("Exit_Floor", 1400, 2040, 60, 260, -10, 0, MI_FLOOR, folder="Geometry/Exit")
 box("Exit_Ceiling", 1400, 2040, 40, 280, 300, 310, MI_CEIL, folder="Geometry/Exit")
 box("Exit_WallLeft", 1400 + T, 2040, 40, 60, 0, 300, MI_WALL, folder="Geometry/Exit")
 box("Exit_WallRight", 1400 + T, 2040, 260, 280, 0, 300, MI_WALL, folder="Geometry/Exit")
-box("Exit_WallEnd", 2020, 2040, 60, 260, 0, 300, MI_WALL, folder="Geometry/Exit")
+# 끝 벽: 장치 시험실 보안문 y 100~220, 문 너머에 다음 스테이지로 넘어가는 작은 칸
+box("Exit_WallEnd_1", 2020, 2040, 60, 100, 0, 300, MI_WALL, folder="Geometry/Exit")
+box("Exit_WallEnd_2", 2020, 2040, 220, 260, 0, 300, MI_WALL, folder="Geometry/Exit")
+box("Exit_WallEnd_Header", 2020, 2040, 100, 220, DOOR_H, 300, MI_WALL, folder="Geometry/Exit")
+box("Gate_Floor", 2040, 2260, 60, 260, -10, 0, MI_FLOOR, folder="Geometry/Exit")
+box("Gate_Ceiling", 2040, 2260, 40, 280, 300, 310, MI_CEIL, folder="Geometry/Exit")
+box("Gate_WallLeft", 2040, 2260, 40, 60, 0, 300, MI_WALL, folder="Geometry/Exit")
+box("Gate_WallRight", 2040, 2260, 260, 280, 0, 300, MI_WALL, folder="Geometry/Exit")
+box("Gate_WallEnd", 2240, 2260, 60, 260, 0, 300, MI_WALL, folder="Geometry/Exit")
 
 # ---------------------------------------------------------------- 조명 (어둡고 파란 빛) / 후처리
 BLUE = (0.45, 0.6, 1.0)
@@ -450,19 +458,18 @@ lock_ring = sign("S3_Lock_Ring", "◯  잠김", 1399, 120, 330, yaw=180.0, size=
 lock_bp = sign("S3_Lock_Blueprint", "▣  잠김", 1399, 200, 330, yaw=180.0, size=(300, 80), font=30,
                bg=(0.05, 0.05, 0.06, 1.0), text_color=(1.0, 0.3, 0.2), folder="Puzzle")
 
-device_door = spawn(unreal.PuzzleDoor, V(2010, 160, 0), label="S3_DeviceDoor", folder="Puzzle")
+device_door = spawn(unreal.PuzzleDoor, V(2030, 160, 0), label="S3_DeviceDoor", folder="Puzzle")
 device_door.set_editor_property("door_color", unreal.LinearColor(0.2, 0.22, 0.25, 1.0))
-gate = spawn(unreal.PuzzleStageGate, V(2020, 160, 0), label="S3_StageGate", folder="Navigation")
+gate = spawn(unreal.PuzzleStageGate, V(2030, 160, 0), label="S3_StageGate", folder="Navigation")
 gate.set_editor_property("next_level", "/Game/VRPuzzle/Maps/L_04_Device")
 gate.set_editor_property("door", device_door)
-gate.set_editor_property("locked", True)   # L_04 준비 중
 
 # ---------------------------------------------------------------- 글자 (대사 초안)
 sign("S3_Sign_Title", "3. 관측실\n시점 측정 구역", 1, 600, 300, yaw=0.0, size=(700, 220), font=40,
      bg=(0.2, 0.22, 0.25, 1.0), text_color=(0.9, 0.9, 0.85))
 sign("S3_Sign_ArriveDoor", "2. 원근 실험실", -319, 160, 255, yaw=0.0, size=(500, 90), font=34,
      bg=(0.2, 0.22, 0.25, 1.0), text_color=(0.9, 0.9, 0.85))
-sign("S3_Sign_Device", "4. 장치 시험실\n(보안문 — 준비 중)", 2019, 160, 260, yaw=180.0, size=(500, 160), font=34,
+sign("S3_Sign_Device", "4. 장치 시험실", 2019, 160, 260, yaw=180.0, size=(500, 160), font=34,
      bg=(0.2, 0.22, 0.25, 1.0), text_color=(0.9, 0.9, 0.85))
 
 # ---------------------------------------------------------------- 진행 담당

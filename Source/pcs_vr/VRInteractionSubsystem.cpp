@@ -16,6 +16,7 @@
 #include "InputCoreTypes.h"
 #include "InputMappingContext.h"
 #include "PerspectiveCube.h"
+#include "PuzzleHandDevice.h"
 #include "PuzzleInteractComponent.h"
 #include "PuzzleUtils.h"
 
@@ -97,19 +98,22 @@ void UVRInteractionSubsystem::SetupInput(APlayerController* PC)
 		LoadObject<UInputAction>(nullptr, TEXT("/Game/VRTemplate/Input/Actions/IA_Grab_Right.IA_Grab_Right")),
 		LoadObject<UInputAction>(nullptr, TEXT("/Game/VRTemplate/Input/Actions/Hands/IA_Hand_Grasp_Right.IA_Hand_Grasp_Right")) };
 
-	// 데스크톱 테스트: E 키 / R 키 (키보드는 OpenXR을 거치지 않아서 새 매핑으로 충분)
+	// 데스크톱 테스트: E 키 / R 키 / Q 키 (키보드는 OpenXR을 거치지 않아서 새 매핑으로 충분)
 	DesktopAction = NewObject<UInputAction>(this, TEXT("IA_Puzzle_Interact_Desktop"));
 	DesktopRayAction = NewObject<UInputAction>(this, TEXT("IA_Puzzle_RayGrab_Desktop"));
+	DesktopDeviceLeftAction = NewObject<UInputAction>(this, TEXT("IA_Puzzle_DeviceLeft_Desktop"));
 	Context = NewObject<UInputMappingContext>(this, TEXT("IMC_Puzzle_Interact"));
 	Context->MapKey(DesktopAction, EKeys::E);
 	Context->MapKey(DesktopRayAction, EKeys::R);
+	Context->MapKey(DesktopDeviceLeftAction, EKeys::Q);
 	Input->AddMappingContext(Context, 5);
 	EIC->BindAction(DesktopAction, ETriggerEvent::Started, this, &UVRInteractionSubsystem::OnDesktopInteract);
 	EIC->BindAction(DesktopRayAction, ETriggerEvent::Started, this, &UVRInteractionSubsystem::OnDesktopRayGrab);
+	EIC->BindAction(DesktopDeviceLeftAction, ETriggerEvent::Started, this, &UVRInteractionSubsystem::OnDesktopDeviceLeft);
 
 	PlayerInput = Input->GetPlayerInput();
 	bInputReady = true;
-	UE_LOG(LogVRInteract, Log, TEXT("트리거 상호작용 입력 준비 완료 (템플릿 트리거/그립 액션 읽기 / 데스크톱 E, R)"));
+	UE_LOG(LogVRInteract, Log, TEXT("트리거 상호작용 입력 준비 완료 (템플릿 트리거/그립 액션 읽기 / 데스크톱 E, R, Q)"));
 }
 
 float UVRInteractionSubsystem::ReadTrigger(const TArray<TObjectPtr<UInputAction>>& Actions) const
@@ -140,14 +144,60 @@ void UVRInteractionSubsystem::UpdateTriggers()
 	else if (bRightDown && Right < 0.4f) { bRightDown = false; }
 }
 
+void UVRInteractionSubsystem::SetActiveDevice(APuzzleHandDevice* Device)
+{
+	ActiveDevice = Device;
+	if (!Device)
+	{
+		return;
+	}
+	// 레이로 들고 있던 큐브는 놓는다 (장치를 찬 동안에는 물건을 잡을 수 없음)
+	for (FRayHand* Hand : { &LeftRay, &RightRay })
+	{
+		if (APerspectiveCube* Cube = Hand->Held.Get())
+		{
+			Cube->EndRayGrab();
+		}
+		if (APerspectiveCube* Old = Hand->Aimed.Get())
+		{
+			Old->SetAimHighlight(false);
+		}
+		Hand->Held.Reset();
+		Hand->Aimed.Reset();
+	}
+	if (APerspectiveCube* Cube = DesktopHeld.Get())
+	{
+		Cube->EndRayGrab();
+	}
+	DesktopHeld.Reset();
+}
+
 void UVRInteractionSubsystem::OnLeftTrigger()
 {
+	if (APuzzleHandDevice* Device = ActiveDevice.Get())
+	{
+		Device->PressLeft();
+		return;
+	}
 	InteractWithHand(TEXT("MotionControllerLeftGrip"));
 }
 
 void UVRInteractionSubsystem::OnRightTrigger()
 {
+	if (APuzzleHandDevice* Device = ActiveDevice.Get())
+	{
+		Device->PressRight();
+		return;
+	}
 	InteractWithHand(TEXT("MotionControllerRightGrip"));
+}
+
+void UVRInteractionSubsystem::OnDesktopDeviceLeft()
+{
+	if (APuzzleHandDevice* Device = ActiveDevice.Get())
+	{
+		Device->PressLeft();
+	}
 }
 
 void UVRInteractionSubsystem::InteractWithHand(const TCHAR* GripName)
@@ -208,6 +258,11 @@ void UVRInteractionSubsystem::InteractWithHand(const TCHAR* GripName)
 
 void UVRInteractionSubsystem::OnDesktopInteract()
 {
+	if (APuzzleHandDevice* Device = ActiveDevice.Get())
+	{
+		Device->PressRight();
+		return;
+	}
 	FVector ViewLoc;
 	FRotator ViewRot;
 	if (!PuzzleUtils::GetPlayerView(this, ViewLoc, ViewRot))
@@ -250,6 +305,10 @@ void UVRInteractionSubsystem::OnDesktopInteract()
 
 void UVRInteractionSubsystem::UpdateRayGrab()
 {
+	if (ActiveDevice.IsValid())
+	{
+		return;
+	}
 	UpdateRayHand(LeftRay, ReadTrigger(LeftGripActions));
 	UpdateRayHand(RightRay, ReadTrigger(RightGripActions));
 }
@@ -341,6 +400,10 @@ APerspectiveCube* UVRInteractionSubsystem::TraceCube(const FVector& Start, const
 
 void UVRInteractionSubsystem::OnDesktopRayGrab()
 {
+	if (ActiveDevice.IsValid())
+	{
+		return;
+	}
 	if (APerspectiveCube* Held = DesktopHeld.Get())
 	{
 		Held->EndRayGrab();

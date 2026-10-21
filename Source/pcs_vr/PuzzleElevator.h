@@ -39,6 +39,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Elevator", meta = (EditCondition = "bArrivalOnly"))
 	float ArrivalDelay = 1.5f;
 
+	/** true면 도착해서 문은 열리지만 출발하지 않는다 (다음 스테이지가 아직 없을 때) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Elevator")
+	bool bOutOfService = false;
+
 	/** 안에 들어간 뒤 문이 닫히기까지 기다리는 시간(초) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Elevator")
 	float DepartDelay = 1.5f;
