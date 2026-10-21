@@ -40,21 +40,21 @@ def import_texture(asset_id, kind):
     """kind: Color / NormalDX / Roughness"""
     name = "T_%s_%s" % (asset_id, "Normal" if kind == "NormalDX" else kind)
     path = TEX_DIR + "/" + name
-    if not eal.does_asset_exist(path):
-        src = os.path.join(SRC_DIR, asset_id, "%s_2K-JPG_%s.jpg" % (asset_id, kind))
-        if not os.path.exists(src):
-            raise RuntimeError("텍스처 파일 없음: " + src)
-        staged_dir = os.path.join(SRC_DIR, "_staged")
-        os.makedirs(staged_dir, exist_ok=True)
-        staged = os.path.join(staged_dir, name + ".jpg")
-        shutil.copyfile(src, staged)
-        task = unreal.AssetImportTask()
-        task.set_editor_property("filename", staged)
-        task.set_editor_property("destination_path", TEX_DIR)
-        task.set_editor_property("automated", True)
-        task.set_editor_property("replace_existing", True)
-        task.set_editor_property("save", False)
-        at.import_asset_tasks([task])
+    # 원본이 바뀌어도 늘 다시 가져온다 (작은 텍스처라 빠름)
+    src = os.path.join(SRC_DIR, asset_id, "%s_2K-JPG_%s.jpg" % (asset_id, kind))
+    if not os.path.exists(src):
+        raise RuntimeError("텍스처 파일 없음: " + src)
+    staged_dir = os.path.join(SRC_DIR, "_staged")
+    os.makedirs(staged_dir, exist_ok=True)
+    staged = os.path.join(staged_dir, name + ".jpg")
+    shutil.copyfile(src, staged)
+    task = unreal.AssetImportTask()
+    task.set_editor_property("filename", staged)
+    task.set_editor_property("destination_path", TEX_DIR)
+    task.set_editor_property("automated", True)
+    task.set_editor_property("replace_existing", True)
+    task.set_editor_property("save", False)
+    at.import_asset_tasks([task])
     tex = unreal.load_asset(path)
     if kind == "NormalDX":
         tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_NORMALMAP)
@@ -75,6 +75,32 @@ def existing_set(prefix):
     base = "/Game/VRPuzzle/Textures/Walls/T_" + prefix
     return {"Color": unreal.load_asset(base + "_Color"), "NormalDX": unreal.load_asset(base + "_Normal"),
             "Roughness": unreal.load_asset(base + "_Roughness")}
+
+
+def import_noise_texture():
+    """얼룩 무늬용 흑백 텍스처 (Metal021의 거칠기 맵: 넓게 번진 구름 같은 무늬라 때·얼룩 모양으로 좋음)"""
+    name = "T_GrimeNoise"
+    path = TEX_DIR + "/" + name
+    # 없을 때만 가져온다. 매번 다시 가져오면 가져오기(비동기)가 아래 설정(선형·마스크)을 덮어써서 얼룩이 사라진다
+    if not eal.does_asset_exist(path):
+        src = os.path.join(SRC_DIR, "Metal021", "Metal021_2K-JPG_Roughness.jpg")
+        staged_dir = os.path.join(SRC_DIR, "_staged")
+        os.makedirs(staged_dir, exist_ok=True)
+        staged = os.path.join(staged_dir, name + ".jpg")
+        shutil.copyfile(src, staged)
+        task = unreal.AssetImportTask()
+        task.set_editor_property("filename", staged)
+        task.set_editor_property("destination_path", TEX_DIR)
+        task.set_editor_property("automated", True)
+        task.set_editor_property("replace_existing", True)
+        task.set_editor_property("save", False)
+        at.import_asset_tasks([task])
+    tex = unreal.load_asset(path)
+    tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_MASKS)
+    tex.set_editor_property("srgb", False)
+    tex.set_editor_property("max_texture_size", 512)   # 흐린 얼룩이라 작아도 충분 (메모리 절약)
+    eal.save_loaded_asset(tex, False)
+    return tex
 
 
 # ---------------------------------------------------------------- 머티리얼 도우미 (build_l02_perspective.py와 같은 방식)
@@ -150,16 +176,25 @@ def world_aligned(mat, tex_obj, tile, func, x, y):
     return e
 
 
-def noise(mat, position, scale, levels, x, y):
-    """0 ~ 1 사이 부드러운 노이즈"""
-    e = expr(mat, unreal.MaterialExpressionNoise, x, y)
-    e.set_editor_property("scale", scale)
-    e.set_editor_property("levels", levels)
-    e.set_editor_property("output_min", 0.0)
-    e.set_editor_property("output_max", 1.0)
-    e.set_editor_property("quality", 1)
-    connect(position, "", e, "Position")
-    return e
+GRIME_NOISE = None   # build_surface_material()가 정함 (얼룩 무늬 흑백 텍스처)
+
+
+def noise(mat, position, scale, x, y):
+    """0 ~ 1 얼룩 정도 (1 = 진한 얼룩). 계산 노이즈 대신 흑백 얼룩 텍스처를 한 번 읽는다 (VR에서 훨씬 가벼움).
+    3D 위치를 (x + z, y - z)로 펼쳐 읽어서 바닥·벽 어느 면이든 무늬가 생긴다. scale = 1 / 무늬 한 장의 크기(cm)"""
+    r = mask(mat, position, "r", x - 450, y)
+    g = mask(mat, position, "g", x - 450, y + 60)
+    b = mask(mat, position, "b", x - 450, y + 120)
+    u = binop(mat, unreal.MaterialExpressionAdd, r, b, x - 330, y)
+    v = binop(mat, unreal.MaterialExpressionSubtract, g, b, x - 330, y + 80)
+    uv = binop(mat, unreal.MaterialExpressionAppendVector, u, v, x - 220, y + 40)
+    uv = binop(mat, unreal.MaterialExpressionMultiply, uv, const(mat, scale, x - 220, y + 120), x - 120, y + 40)
+    t = expr(mat, unreal.MaterialExpressionTextureSample, x, y)
+    t.set_editor_property("texture", GRIME_NOISE)
+    t.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_MASKS)
+    connect(uv, "", t, "UVs")
+    # 어두운(매끈한) 곳일수록 1에 가깝게. 값 분포: 10% 0.34 / 50% 0.48 / 90% 0.59 (원본 측정)
+    return unop(mat, unreal.MaterialExpressionOneMinus, mask(mat, t, "r", x + 150, y), x + 250, y)
 
 
 def threshold(mat, src, low, gain, x, y):
@@ -184,6 +219,8 @@ def grid_lines(mat, coords, width, x0, y0):
 
 # ---------------------------------------------------------------- M_VRP_Surface
 def build_surface_material(default_texs):
+    global GRIME_NOISE
+    GRIME_NOISE = import_noise_texture()
     path = MAT_DIR + "/M_VRP_Surface"
     if eal.does_asset_exist(path):
         mat = unreal.load_asset(path)
@@ -239,21 +276,21 @@ def build_surface_material(default_texs):
     band0 = unop(mat, unreal.MaterialExpressionSaturate, binop(mat, unreal.MaterialExpressionDivide, above, grime_h, X + 550, 250), X + 700, 250)
     band1 = unop(mat, unreal.MaterialExpressionOneMinus, band0, X + 850, 250)
     band = binop(mat, unreal.MaterialExpressionMultiply, band1, band1, X + 1000, 250)
-    band_n = noise(mat, wp, 0.02, 3, X + 850, 350)   # 띠 경계를 들쭉날쭉하게
-    band = binop(mat, unreal.MaterialExpressionMultiply, band, binop(mat, unreal.MaterialExpressionAdd, band_n, const(mat, 0.4, X + 1000, 400), X + 1150, 380), X + 1300, 280)
+    band_n = noise(mat, wp, 1.0 / 180.0, X + 850, 350)   # 띠 경계를 들쭉날쭉하게
+    band = binop(mat, unreal.MaterialExpressionMultiply, band, binop(mat, unreal.MaterialExpressionAdd, band_n, const(mat, 0.7, X + 1000, 400), X + 1150, 380), X + 1300, 280)
     band = binop(mat, unreal.MaterialExpressionMultiply, band, wall_mask, X + 1450, 250)
     band = binop(mat, unreal.MaterialExpressionMultiply, band, scalar(mat, "GrimeAmount", 0.7, X + 1450, 350), X + 1600, 250)
     # 2) 큰 얼룩 (모든 면)
-    stain_n = noise(mat, wp, 0.004, 4, X + 400, 550)
-    stain = threshold(mat, stain_n, 0.5, 3.0, X + 600, 550)
+    stain_n = noise(mat, wp, 1.0 / 450.0, X + 400, 550)
+    stain = threshold(mat, stain_n, 0.4, 3.0, X + 600, 550)
     stain = binop(mat, unreal.MaterialExpressionMultiply, stain, scalar(mat, "StainAmount", 0.5, X + 1100, 650), X + 1300, 550)
     # 3) 물 흐른 세로 자국 (벽에만): Z 방향으로 길게 늘인 노이즈
     stretched = binop(mat, unreal.MaterialExpressionMultiply, wp, const3(mat, (1.0, 1.0, 0.06), X + 200, 750), X + 400, 750)
-    streak_n = noise(mat, stretched, 0.05, 3, X + 550, 750)
-    streak = threshold(mat, streak_n, 0.6, 4.0, X + 750, 750)
+    streak_n = noise(mat, stretched, 1.0 / 120.0, X + 550, 750)
+    streak = threshold(mat, streak_n, 0.42, 4.0, X + 750, 750)
     # 벽 전체에 고르게 있으면 줄무늬처럼 보이므로, 물이 새던 몇 군데(큰 노이즈 덩어리)에만 남긴다
-    patch_n = noise(mat, wp, 0.0022, 2, X + 550, 950)
-    patch = threshold(mat, patch_n, 0.5, 3.0, X + 750, 950)
+    patch_n = noise(mat, wp, 1.0 / 900.0, X + 550, 950)
+    patch = threshold(mat, patch_n, 0.32, 3.0, X + 750, 950)
     streak = binop(mat, unreal.MaterialExpressionMultiply, streak, patch, X + 1100, 800)
     # 천장에서 새어 내려온 자국이라 위쪽이 진하고 아래로 갈수록 옅어짐 (바닥에서 2.5m 위가 가장 진함)
     high = unop(mat, unreal.MaterialExpressionSaturate, binop(mat, unreal.MaterialExpressionDivide, above, const(mat, 250.0, X + 900, 1100), X + 1050, 1050), X + 1200, 1050)

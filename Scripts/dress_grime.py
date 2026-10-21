@@ -2,7 +2,8 @@
 """
 연구소 안 스테이지 맵(L_01 ~ L_04)에 20년 동안 버려진 흔적을 깐다: 벽을 따라 쌓인 먼지 더미, 떨어진 콘크리트 조각, 누렇게 바랜 종이.
 - 바닥 액터(이름에 Floor가 들어간 StaticMeshActor)를 찾아 그 가장자리(벽 쪽 45cm 띠)에만 놓는다 → 퍼즐·길을 막지 않음
-- 모두 충돌·내비게이션 없음 (원근 큐브 놓기, 텔레포트, 레이 잡기에 영향 없음)
+- 액터 수백 개 대신 AInstancedClutter 하나에 (메시, 머티리얼) 묶음별 인스턴스로 그린다 (드로우콜 절약)
+- 모두 충돌·내비게이션·그림자 없음 (원근 큐브 놓기, 텔레포트, 레이 잡기에 영향 없음)
 - 라벨이 Grime_ 으로 시작하는 액터는 이 스크립트가 만든 것: 다시 실행하면 지우고 새로 깐다 (맵을 다시 만든 뒤에도 다시 돌리면 됨)
 - 벽·바닥 자체의 때와 얼룩은 setup_grime_materials.py (머티리얼)
 
@@ -72,18 +73,14 @@ MI_PAPER_OLD = ensure_solid_mi("MI_VRP_PaperOld", (0.62, 0.56, 0.42), 0.95)
 MI_PAPER_DARK = ensure_solid_mi("MI_VRP_PaperStained", (0.42, 0.37, 0.28), 0.95)
 
 
+GROUPS = {}   # (메시, 머티리얼) -> 트랜스폼 목록. dress()가 맵마다 비우고 마지막에 인스턴스 액터 하나로 만든다
+
+
 def piece(label, mesh, loc, size, mi, yaw=0.0, pitch=0.0, roll=0.0):
-    a = eas.spawn_actor_from_class(unreal.StaticMeshActor, loc, unreal.Rotator(roll=roll, pitch=pitch, yaw=yaw))
-    a.set_actor_label(label)
-    a.set_folder_path("Grime")
-    smc = a.static_mesh_component
-    smc.set_static_mesh(mesh)
-    smc.set_material(0, mi)
-    smc.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
-    smc.set_editor_property("can_ever_affect_navigation", False)
-    smc.set_editor_property("cast_shadow", size[2] > 3.0)
-    a.set_actor_scale3d(unreal.Vector(size[0] / 100.0, size[1] / 100.0, size[2] / 100.0))
-    return a
+    """잡동사니 하나를 묶음에 추가 (액터를 따로 만들지 않음 → AInstancedClutter 하나로 그림)"""
+    xf = unreal.Transform(loc, unreal.Rotator(roll=roll, pitch=pitch, yaw=yaw),
+                          unreal.Vector(size[0] / 100.0, size[1] / 100.0, size[2] / 100.0))
+    GROUPS.setdefault((mesh, mi), []).append(xf)
 
 
 def edge_point(rect, rng):
@@ -126,6 +123,7 @@ def dress(map_name):
             if e.x > 60 and e.y > 60:
                 floors.append((label, (o.x - e.x, o.y - e.y, o.x + e.x, o.y + e.y), o.z + e.z))
 
+    GROUPS.clear()
     rng = random.Random(sum(ord(c) for c in map_name))   # 맵마다 같은 배치
     count = 0
     for label, rect, top in floors:
@@ -158,8 +156,20 @@ def dress(map_name):
                   (r, r * 0.8, rng.uniform(3.0, 6.0)), MI_DUST, yaw=rng.uniform(0, 360))
             count += 1
 
+    clutter = eas.spawn_actor_from_class(unreal.InstancedClutter, unreal.Vector(0, 0, 0))
+    clutter.set_actor_label("Grime_Clutter")
+    clutter.set_folder_path("Grime")
+    groups = []
+    for (mesh, mi), xfs in GROUPS.items():
+        g = unreal.ClutterGroup()
+        g.set_editor_property("mesh", mesh)
+        g.set_editor_property("material", mi)
+        g.set_editor_property("transforms", xfs)
+        groups.append(g)
+    clutter.set_editor_property("groups", groups)
+    # 컴포넌트는 OnConstruction(에디터)과 BeginPlay(게임)에서 만들어진다
     unreal.EditorLoadingAndSavingUtils.save_map(world, "/Game/VRPuzzle/Maps/" + map_name)
-    log("%s: 이전 %d개 지움, %d개 깔기 (바닥 %d개)" % (map_name, removed, count, len(floors)))
+    log("%s: 이전 %d개 지움, %d개 깔기 (바닥 %d개, 인스턴스 묶음 %d개)" % (map_name, removed, count, len(floors), len(GROUPS)))
 
 
 for m in MAPS:

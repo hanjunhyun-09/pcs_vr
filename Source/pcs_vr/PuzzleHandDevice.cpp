@@ -27,11 +27,11 @@ namespace
 
 	// 상자 크기와 윗면 배치 (상자 좌표: +X = 플레이어에게서 먼 쪽, +Y = 오른손 쪽, +Z = 위)
 	const FVector BodySize(22.f, 46.f, 14.f);
-	constexpr float TopZ = 7.f;
-	const FVector DialCenter(1.f, -12.f, TopZ + 0.9f);
+	constexpr float DeviceTopZ = 7.f;
+	const FVector DialCenter(1.f, -12.f, DeviceTopZ + 0.9f);
 	constexpr float DialLabelRadius = 8.6f;
-	const FVector WindowCenter(0.f, 4.f, TopZ + 0.9f);
-	const FVector ButtonCenter(1.f, 16.f, TopZ);
+	const FVector WindowCenter(0.f, 4.f, DeviceTopZ + 0.9f);
+	const FVector ButtonCenter(1.f, 16.f, DeviceTopZ);
 	constexpr float ButtonTravel = 1.2f;
 	const FVector SleeveEntry[] = { FVector(-15.f, -10.f, -1.f), FVector(-15.f, 10.f, -1.f) };   // 왼손, 오른손
 
@@ -102,12 +102,12 @@ APuzzleHandDevice::APuzzleHandDevice()
 	Box->SetRelativeTransform(BoxRestOnRack);
 
 	AddPart(TEXT("Body"), Box, Cube, FVector::ZeroVector, BodySize);
-	AddPart(TEXT("TopPlate"), Box, Cube, FVector(0.f, 0.f, TopZ + 0.4f), FVector(BodySize.X - 2.f, BodySize.Y - 2.f, 0.8f));
+	AddPart(TEXT("TopPlate"), Box, Cube, FVector(0.f, 0.f, DeviceTopZ + 0.4f), FVector(BodySize.X - 2.f, BodySize.Y - 2.f, 0.8f));
 	AddPart(TEXT("TrimFront"), Box, Cube, FVector(BodySize.X * 0.5f, 0.f, 0.f), FVector(1.f, BodySize.Y + 1.f, BodySize.Z + 1.f));
 	AddPart(TEXT("TrimBack"), Box, Cube, FVector(-BodySize.X * 0.5f, 0.f, 0.f), FVector(1.f, BodySize.Y + 1.f, BodySize.Z + 1.f));
 	for (int32 i = 0; i < 4; ++i)
 	{
-		const FVector Corner((i & 1 ? 1.f : -1.f) * (BodySize.X * 0.5f - 1.8f), (i & 2 ? 1.f : -1.f) * (BodySize.Y * 0.5f - 1.8f), TopZ + 0.9f);
+		const FVector Corner((i & 1 ? 1.f : -1.f) * (BodySize.X * 0.5f - 1.8f), (i & 2 ? 1.f : -1.f) * (BodySize.Y * 0.5f - 1.8f), DeviceTopZ + 0.9f);
 		AddPart(*FString::Printf(TEXT("Bolt_%d"), i), Box, Cylinder, Corner, FVector(1.2f, 1.2f, 0.4f));
 	}
 
@@ -147,10 +147,10 @@ APuzzleHandDevice::APuzzleHandDevice()
 	// 진행 램프 4개 (플레이어 쪽 가장자리)
 	for (int32 i = 0; i < 4; ++i)
 	{
-		ProgressLamps.Add(AddPart(*FString::Printf(TEXT("Lamp_%d"), i), Box, Sphere, FVector(-8.f, -4.5f + 3.f * i, TopZ + 0.9f), FVector(1.8f, 1.8f, 1.8f)));
+		ProgressLamps.Add(AddPart(*FString::Printf(TEXT("Lamp_%d"), i), Box, Sphere, FVector(-8.f, -4.5f + 3.f * i, DeviceTopZ + 0.9f), FVector(1.8f, 1.8f, 1.8f)));
 	}
 
-	NameplateDisplay = AddDisplay(TEXT("Nameplate"), Box, FVector(8.2f, 4.f, TopZ + 0.85f), FVector2D(400.f, 60.f), 0.035f);
+	NameplateDisplay = AddDisplay(TEXT("Nameplate"), Box, FVector(8.2f, 4.f, DeviceTopZ + 0.85f), FVector2D(400.f, 60.f), 0.035f);
 
 	// 풀린 뒤 받침대 앞쪽에 보이는 각인 (위를 보고, 플레이어 쪽에서 읽힘)
 	EngravingDisplay = AddDisplay(TEXT("EngravingDisplay"), Root, FVector(14.5f, 0.f, 4.2f), FVector2D(640.f, 70.f), 0.04f);

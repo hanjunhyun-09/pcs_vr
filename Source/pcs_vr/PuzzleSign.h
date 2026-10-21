@@ -60,7 +60,11 @@ protected:
 
 private:
 	void ApplyLayout();
+	void WarmupRedraw();
 	UPuzzleTextWidget* GetTextWidget() const;
+
+	FTimerHandle WarmupHandle;
+	int32 WarmupCount = 0;
 
 	UPROPERTY(VisibleAnywhere, Category = "Sign")
 	TObjectPtr<UWidgetComponent> Widget;

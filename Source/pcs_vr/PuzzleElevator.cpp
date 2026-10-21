@@ -84,6 +84,7 @@ APuzzleElevator::APuzzleElevator()
 	CabinLight->SetIntensity(20.f);
 	CabinLight->SetAttenuationRadius(400.f);
 	CabinLight->SetLightColor(FLinearColor(1.f, 0.95f, 0.85f));
+	CabinLight->SetCastShadows(false);   // 좁은 상자 안이라 그림자 차이가 거의 없음 (VR 프레임 절약)
 }
 
 UStaticMeshComponent* APuzzleElevator::AddBox(const TCHAR* Name, const FVector& Center, const FVector& SizeCm, UStaticMesh* Mesh)
@@ -92,7 +93,10 @@ UStaticMeshComponent* APuzzleElevator::AddBox(const TCHAR* Name, const FVector& 
 	Box->SetupAttachment(Root);
 	Box->SetStaticMesh(Mesh);
 	Box->SetRelativeLocation(Center);
-	Box->SetRelativeScale3D(SizeCm / 100.f);
+	// 엘리베이터 바닥·벽 면이 맵의 바닥·벽 면(10cm 단위)과 정확히 겹치면 두 면이 번갈아 보이며 지지직거린다(z-fighting).
+	// 조각마다 몇 mm씩 다르게 부풀려서 어떤 면도 맵이나 다른 조각과 같은 평면에 놓이지 않게 한다 (바닥은 3mm 높아짐)
+	const float Inflate = 0.6f + 0.1f * Shell.Num();
+	Box->SetRelativeScale3D((SizeCm + FVector(Inflate)) / 100.f);
 	Shell.Add(Box);
 	return Box;
 }
