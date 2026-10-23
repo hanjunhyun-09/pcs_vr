@@ -17,7 +17,7 @@ L_05_Core (5스테이지: 중앙 코어) 그레이박스를 만든다.
   원근법 구역    서쪽 x -1712~-912, y -300~300 (8m x 6m), 천장 4m. 홀로 나가는 문은 좁은문(폭 60cm, x -902)
                  3m 코어 축 + 보관함(디스펜서). 좁은문에서 ● 슬롯까지 약 7.2m (노션: 6m 이상)
   시점 구역      북쪽 2층 발코니 x -450~450, y 620~900, 높이 4m. 텔레포트 발판으로 오르내림
-                 관측 위치 ① (-250, 700) → ◆ ●, ② (250, 700) → ▲ ■. 뒤쪽 벽에 ▲ 부품 보관함
+                 뒤쪽 판의 회전 원판 ① → ◆ ●, ② → ▲ ■ (버튼으로 고리를 돌려 그림 잇기). 가운데에 ▲ 부품 보관함
   장치 구역      동쪽 x 912~1412, y -250~250 (5m x 5m), 천장 3m. 장치 받침대 + 동쪽 벽 코어 제어판(램프 4개)
   엘리베이터     남쪽 벽 너머: 도착(x -130, L_04에서 타고 옴) / 출구(x 130, 코어가 멈추면 열림)
 """
@@ -420,24 +420,34 @@ lift_up.set_editor_property("destination", V(320, 780, BZ))
 lift_down = spawn(unreal.PuzzleLiftPad, V(-330, 780, BZ), label="S5_LiftDown", folder="Navigation")
 lift_down.set_editor_property("destination", V(-300, 480, 0))
 sign("S5_Sign_LiftUp", "관측 발코니 ↑", 300, 619, BZ - 60, yaw=-90.0, size=(420, 80), font=32, **PLATE)
-sign("S5_Sign_LiftDown", "↓ 홀로 내려가기", -330, 899, BZ + 160, yaw=-90.0, size=(420, 80), font=32, **PLATE)
+sign("S5_Sign_LiftDown", "↓ 홀로 내려가기", -330, 619, BZ - 60, yaw=-90.0, size=(420, 80), font=32, **PLATE)
 
-# 관측 위치 ① ② : 발자국·눈금 없이 바닥의 번호 동그라미만 (노션은 난간 번호판이었지만 정답 자리가 안 보여서 바닥으로)
-EYE_H = 160.0
-VIEWS = [
-    # 이름, 번호판, 관측 위치(바닥), 조각이 모여 보이는 곳, 기호 2개
-    ("A", "①", (-250.0, 700.0), (-380.0, -250.0, 150.0), ("◆", "●")),
-    ("B", "②", (250.0, 700.0), (380.0, -250.0, 150.0), ("▲", "■")),
+# 관측 원판 ① ② (노션의 '시점 맞추기'가 VR에서 너무 어려워서 교체): 발코니 뒤쪽 판의 회전 원판 2개.
+# 원판마다 안쪽 / 가운데 / 바깥 고리에 기호 그림이 조각으로 나뉘어 그려져 있고, 아래 버튼 3개로 고리를 한 칸(45도)씩 돌린다.
+# 세 고리의 그림이 이어지면 성공 → ① ◆ ●, ② ▲ ■ (= 코드 ◆●▲■)
+BOARD_Y = 840.0           # 발코니 뒤쪽 판의 앞면 (원형 벽이 휘어 있어서 평평한 판을 앞에 세움)
+box("Balcony_Board_W", -400, -60, BOARD_Y, BOARD_Y + 12, BZ, BZ + 300, MI_WALL, folder="Geometry/Balcony")
+box("Balcony_Board_E", 60, 400, BOARD_Y, BOARD_Y + 12, BZ, BZ + 300, MI_WALL, folder="Geometry/Balcony")
+box("Balcony_Board_Top", -60, 60, BOARD_Y, BOARD_Y + 12, BZ + 152, BZ + 300, MI_WALL, folder="Geometry/Balcony")
+
+DISC_R = 55.0
+RING_EDGES = (18.0, 31.0, DISC_R)    # 안쪽 고리 < 18cm ≤ 가운데 < 31cm ≤ 바깥
+SYM = 34.0                           # 원판 위 기호 크기 (cm)
+DISCS = [
+    # 이름, 번호, 가운데 x (보는 사람 왼쪽 = +x), 기호 2개 (왼쪽부터), 시작 칸 (안쪽, 가운데, 바깥)
+    ("A", "①", 230.0, ("◆", "●"), [0, 3, 6]),
+    ("B", "②", -230.0, ("▲", "■"), [2, 7, 4]),
 ]
-SYM = 120.0   # 모여 보이는 면 위 기호 크기 (cm)
+DISC_Z = BZ + 190.0
+BUTTON_Z = BZ + 108.0                # 노션: 버튼 높이 100 ~ 130cm
 
 
-def symbol_segments(sym):
-    """면 위 (u 오른쪽, v 위) 선분 목록. 채워진 기호(● ■)는 안쪽 선을 하나 더 그린다"""
-    h = SYM / 2.0
+def symbol_segments(sym, size):
+    """면 위 (u 오른쪽, v 위) 선분 목록. 짧게 잘라서 고리 셋에 고루 나뉘게. 채워진 기호(● ■)는 안쪽 선을 하나 더"""
+    h = size / 2.0
     segs = []
 
-    def poly(pts, split=2):
+    def poly(pts, split=3):
         for i in range(len(pts)):
             p0, p1 = pts[i], pts[(i + 1) % len(pts)]
             for j in range(split):
@@ -445,60 +455,106 @@ def symbol_segments(sym):
                 segs.append(((p0[0] + (p1[0] - p0[0]) * t0, p0[1] + (p1[1] - p0[1]) * t0),
                              (p0[0] + (p1[0] - p0[0]) * t1, p0[1] + (p1[1] - p0[1]) * t1)))
 
+    def circle(r, n):
+        poly([(r * math.cos(2 * math.pi * i / n), r * math.sin(2 * math.pi * i / n)) for i in range(n)], 1)
+
     if sym == "◆":
         poly([(0, h), (h, 0), (0, -h), (-h, 0)])
-        poly([(0, h * 0.5), (h * 0.5, 0), (0, -h * 0.5), (-h * 0.5, 0)], 1)
+        poly([(0, h * 0.5), (h * 0.5, 0), (0, -h * 0.5), (-h * 0.5, 0)], 2)
     elif sym == "●":
-        for r in (h * 0.85, h * 0.45):
-            n = 12 if r > h * 0.5 else 8
-            poly([(r * math.cos(2 * math.pi * i / n), r * math.sin(2 * math.pi * i / n)) for i in range(n)], 1)
+        circle(h * 0.9, 16)
+        circle(h * 0.5, 10)
     elif sym == "▲":
         poly([(0, h), (h * 1.05, -h * 0.8), (-h * 1.05, -h * 0.8)])
-        poly([(0, h * 0.35), (h * 0.45, -h * 0.5), (-h * 0.45, -h * 0.5)], 1)
+        poly([(0, h * 0.35), (h * 0.45, -h * 0.5), (-h * 0.45, -h * 0.5)], 2)
     elif sym == "■":
         s = h * 0.85
         poly([(-s, s), (s, s), (s, -s), (-s, -s)])
-        poly([(-s * 0.5, s * 0.5), (s * 0.5, s * 0.5), (s * 0.5, -s * 0.5), (-s * 0.5, -s * 0.5)], 1)
+        poly([(-s * 0.5, s * 0.5), (s * 0.5, s * 0.5), (s * 0.5, -s * 0.5), (-s * 0.5, -s * 0.5)], 2)
     return segs
 
 
-view_actors = []
-for name, number, (vx, vy), (tx, ty, tz), symbols in VIEWS:
-    eye = V(vx, vy, BZ + EYE_H)
-    target = V(tx, ty, tz)
-    f = target - eye
-    f = f.normal()
-    up = unreal.Vector(0, 0, 1)
-    right = up.cross(f).normal()        # 보는 사람의 오른쪽
-    vup = f.cross(right).normal()       # 보는 사람의 위
+def movable(a):
+    a.static_mesh_component.set_mobility(unreal.ComponentMobility.MOVABLE)
+    return a
+
+
+FACE_UP = unreal.MathLibrary.make_rot_from_z(unreal.Vector(0, -1, 0))   # 원기둥 축을 원판 앞(-Y)으로
+RING_MI = (MI_TRIM, MI_METAL, MI_DARK)   # 안쪽 → 바깥 (고리 경계가 보이게 색을 다르게)
+disc_actors = []
+for name, number, cx, symbols, start in DISCS:
+    def W(u, v, depth, cx=cx):
+        """원판 면 위 (u 보는 사람 오른쪽 = -x, v 위) → 월드. depth = 판 앞면에서 나온 거리"""
+        return V(cx - u, BOARD_Y - depth, DISC_Z + v)
+
+    # 고리 판 (바깥이 가장 뒤). 판 자체가 고리 액터 = 회전 중심이 원판 가운데
+    rings = [None, None, None]
+    for idx in (2, 1, 0):                  # 0 = 안쪽
+        r_out = RING_EDGES[idx]
+        depth = 2.0 + (2 - idx) * 1.5
+        plate = spawn(unreal.StaticMeshActor, W(0, 0, depth), label="S5_Disc%s_Ring%d" % (name, idx), folder="Puzzle/Discs/" + name)
+        plate.set_actor_rotation(FACE_UP, False)
+        movable(plate)
+        plate.static_mesh_component.set_static_mesh(CYLINDER)
+        plate.static_mesh_component.set_material(0, RING_MI[idx])
+        plate.static_mesh_component.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+        plate.set_actor_scale3d(unreal.Vector(r_out * 2 / 100.0, r_out * 2 / 100.0, 0.015))
+        rings[idx] = plate
+        # 고리마다 노란 눈금 하나 (몇 칸 돌았는지 보이게)
+        mark = spawn(unreal.StaticMeshActor, W(0, r_out - 4.0, depth + 1.0), label="S5_Disc%s_Mark%d" % (name, idx),
+                     folder="Puzzle/Discs/" + name)
+        movable(mark)
+        mark.static_mesh_component.set_static_mesh(CUBE)
+        mark.static_mesh_component.set_material(0, MI_WARN)
+        mark.static_mesh_component.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+        mark.set_actor_scale3d(unreal.Vector(0.03, 0.02, 0.05))
+        attach(mark, plate)
+
+    # 기호 그림 조각: 선분 가운데가 들어 있는 고리에 붙인다
     pieces = []
+    counts = [0, 0, 0]
     for si, sym in enumerate(symbols):
-        center = target + right * ((si - 0.5) * SYM * 1.9)
-        for j, ((u0, v0), (u1, v1)) in enumerate(symbol_segments(sym)):
-            p0 = center + right * u0 + vup * v0
-            p1 = center + right * u1 + vup * v1
-            s = random.uniform(0.38, 0.95)   # 선분마다 다른 거리 → 관측 위치에서만 기호 하나로 겹쳐 보임
-            pieces.append(pipe("S5_Paint_%s_%d_%02d" % (name, si, j), lerp(eye, p0, s), lerp(eye, p1, s), 7.0 * s, MI_PAINT,
-                               "Puzzle/View/" + name))
-    view = spawn(unreal.PuzzleViewPoint, V(vx, vy, BZ), label="S5_View" + name, folder="Puzzle/View")
-    view.set_editor_property("look_target", target)
-    view.set_editor_property("pieces", pieces)
-    view.set_editor_property("piece_color", unreal.LinearColor(0.95, 0.9, 0.8, 1.0))
-    # 판정: 조각을 맞춰 만든 눈높이(160cm) ± 35cm에 눈이 있을 때만 (기호가 실제로 모여 보일 때만 성공)
-    view.set_editor_property("design_eye_height", EYE_H)
-    view.set_editor_property("zone_size", unreal.Vector2D(80.0, 80.0))   # 반지름 40cm
-    view.set_editor_property("min_dot", 0.95)                            # 약 18도
-    view.set_editor_property("glow_radius", 250.0)
-    view_actors.append(view)
-    # 바닥의 관측 자리 표시 (지름 80cm 원 + 번호). 노션의 '난간 번호판'을 바닥으로 옮김: 정답 자리가 눈에 보이게
-    box("S5_ViewMark_%s_Fill" % name, vx - 40, vx + 40, vy - 40, vy + 40, BZ, BZ + 0.2, MI_DARK, folder="Puzzle/View", collision=False)
-    for i in range(16):
-        a0, a1 = 2 * math.pi * i / 16, 2 * math.pi * (i + 1) / 16
-        pipe("S5_ViewMark_%s_Ring_%02d" % (name, i), V(vx + 40 * math.cos(a0), vy + 40 * math.sin(a0), BZ + 0.6),
-             V(vx + 40 * math.cos(a1), vy + 40 * math.sin(a1), BZ + 0.6), 2.5, MI_PAINT, "Puzzle/View")
-    sign("S5_Sign_View" + name, number, vx, vy, BZ + 0.5, yaw=90.0, pitch=90.0, size=(160, 160), font=120, ppc=4.0,
-         bg=(0, 0, 0, 0), text_color=(0.95, 0.9, 0.7), folder="Puzzle/View")
-    log("관측 위치 %s: 조각 %d개" % (number, len(pieces)))
+        cu = (si - 0.5) * SYM * 1.4       # 왼쪽 기호 / 오른쪽 기호
+        for j, ((u0, v0), (u1, v1)) in enumerate(symbol_segments(sym, SYM)):
+            u0, u1 = u0 + cu, u1 + cu
+            mid_r = math.hypot((u0 + u1) / 2.0, (v0 + v1) / 2.0)
+            ring_idx = 0 if mid_r < RING_EDGES[0] else (1 if mid_r < RING_EDGES[1] else 2)
+            seg = pipe("S5_Disc%s_Paint_%d_%02d" % (name, si, j), W(u0, v0, 8.0), W(u1, v1, 8.0), 2.6, MI_PAINT,
+                       "Puzzle/Discs/" + name)
+            movable(seg)
+            attach(seg, rings[ring_idx])
+            pieces.append(seg)
+            counts[ring_idx] += 1
+
+    disc = spawn(unreal.PuzzleRingDisc, W(0, 0, 0), yaw=-90.0, label="S5_Disc" + name, folder="Puzzle/Discs")
+    disc.set_editor_property("rings", rings)
+    disc.set_editor_property("start_steps", start)
+    disc.set_editor_property("pieces", pieces)
+    disc.set_editor_property("piece_color", unreal.LinearColor(0.95, 0.9, 0.8, 1.0))
+
+    # 버튼 3개 (보는 사람 왼쪽부터 안쪽 / 가운데 / 바깥)
+    buttons = []
+    for b, (u, label) in enumerate(((-24.0, "안쪽"), (0.0, "가운데"), (24.0, "바깥"))):
+        btn = spawn(unreal.PuzzleButton, W(u, BUTTON_Z - DISC_Z, 0), yaw=-90.0, label="S5_Disc%s_Button%d" % (name, b),
+                    folder="Puzzle/Discs/" + name)
+        btn.set_editor_property("one_shot", False)
+        btn.set_editor_property("cap_color", unreal.LinearColor(0.9, 0.6, 0.05, 1.0))
+        buttons.append(btn)
+        sign_at("S5_Disc%s_ButtonLabel%d" % (name, b), label, W(u, BUTTON_Z - DISC_Z - 14.0, 0.5), yaw=-90.0, size=(180, 60),
+                font=36, ppc=8.0, bg=(0, 0, 0, 0), text_color=(0.9, 0.9, 0.85), folder="Puzzle/Discs/" + name)
+    disc.set_editor_property("buttons", buttons)
+    disc_actors.append(disc)
+
+    # 원판 테두리 + 번호판
+    for i in range(24):
+        a0, a1 = 2 * math.pi * i / 24, 2 * math.pi * (i + 1) / 24
+        pipe("S5_Disc%s_Rim_%02d" % (name, i), W((DISC_R + 3) * math.cos(a0), (DISC_R + 3) * math.sin(a0), 2.0),
+             W((DISC_R + 3) * math.cos(a1), (DISC_R + 3) * math.sin(a1), 2.0), 4.0, MI_METAL, "Puzzle/Discs/" + name)
+    sign_at("S5_Sign_Disc" + name, number, W(0, DISC_R + 32, 0.5), yaw=-90.0, size=(160, 160), font=120, ppc=4.0,
+            bg=(0.12, 0.13, 0.15, 1.0), text_color=(0.95, 0.9, 0.7), folder="Puzzle/Discs")
+    log("관측 원판 %s: 그림 조각 %d개 (안쪽 / 가운데 / 바깥 %s)" % (number, len(pieces), counts))
+sign("S5_Sign_DiscHelp", "관측 기록 원판\n버튼으로 고리를 돌려 그림을 이으시오", 0, BOARD_Y - 1, BZ + 270, yaw=-90.0, size=(800, 160),
+     font=34, **PLATE)
 
 # 발코니 뒤쪽 벽 보관함 (둘 다 맞추면 열림 → ▲ 부품)
 LK = (0.0, 900.0, BZ + 62.0)   # 가운데 x, 벽 면 y, 바닥 z
@@ -512,7 +568,7 @@ locker_door.set_editor_property("width", 80.0)
 locker_door.set_editor_property("height", 80.0)
 locker_door.set_editor_property("thickness", 3.0)
 locker_door.set_editor_property("door_color", unreal.LinearColor(0.3, 0.32, 0.35, 1.0))
-sign("S5_Sign_Locker", "관측 기록 보관함", 0, LK[1] - 47, LK[2] + 105, yaw=-90.0, size=(400, 70), font=28, **PLATE)
+sign("S5_Sign_Locker", "관측 기록 보관함", 0, BOARD_Y - 1, LK[2] + 105, yaw=-90.0, size=(400, 70), font=28, **PLATE)
 tri_part = part("S5_TrianglePart", 0, LK[1] - 24, LK[2] + 8, (22, 22, 14), (0.95, 0.75, 0.2), "CorePartTriangle", "▲",
                 folder="Puzzle/Locker")
 
@@ -598,8 +654,8 @@ director.set_editor_property("triangle_socket", tri_socket)
 director.set_editor_property("square_socket", sq_socket)
 director.set_editor_property("slot_labels", slot_labels)
 director.set_editor_property("narrow_door_location", V(-CHORD - T / 2, 0, 0))
-director.set_editor_property("view_a", view_actors[0])
-director.set_editor_property("view_b", view_actors[1])
+director.set_editor_property("disc_a", disc_actors[0])
+director.set_editor_property("disc_b", disc_actors[1])
 director.set_editor_property("locker_door", locker_door)
 director.set_editor_property("triangle_part", tri_part)
 director.set_editor_property("balcony_floor_z", ORIGIN.z + BZ)

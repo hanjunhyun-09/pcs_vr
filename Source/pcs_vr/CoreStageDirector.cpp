@@ -18,7 +18,7 @@
 #include "PuzzleSign.h"
 #include "PuzzleToggleTarget.h"
 #include "PuzzleUtils.h"
-#include "PuzzleViewPoint.h"
+#include "PuzzleRingDisc.h"
 #include "TimerManager.h"
 #include "UnrealClient.h"
 #include "VRSmoothLocomotionSubsystem.h"
@@ -40,7 +40,7 @@ ACoreStageDirector::ACoreStageDirector()
 	PrimaryActorTick.bCanEverTick = true;
 
 	NarrowDoorHintMemo = FText::FromString(TEXT("그대로는 안 들어가.\n일단 작게 만들어."));
-	BalconyHintMemo = FText::FromString(TEXT("바닥의 동그라미 위에 서서 홀을 내려다봐.\n우리가 쓰던 관측 자리야."));
+	BalconyHintMemo = FText::FromString(TEXT("원판 아래 버튼으로 고리를 돌려 봐.\n그림이 이어지면 기호가 보일 거야."));
 	NoCodeHintMemo = FText::FromString(TEXT("코드는 위층 관측 발코니에서\n볼 수 있어."));
 	CodeRecordedMemo = FText::FromString(TEXT("코드 ◆ ● ▲ ■\n지도에 적어 뒀어."));
 }
@@ -54,8 +54,8 @@ void ACoreStageDirector::BeginPlay()
 		Locomotion->bBlockLowObstacles = true;
 	}
 
-	if (ViewA) { ViewA->OnSolved.AddDynamic(this, &ACoreStageDirector::HandleViewSolved); }
-	if (ViewB) { ViewB->OnSolved.AddDynamic(this, &ACoreStageDirector::HandleViewSolved); }
+	if (DiscA) { DiscA->OnSolved.AddDynamic(this, &ACoreStageDirector::HandleViewSolved); }
+	if (DiscB) { DiscB->OnSolved.AddDynamic(this, &ACoreStageDirector::HandleViewSolved); }
 	if (Device)
 	{
 		Device->OnPressed.AddDynamic(this, &ACoreStageDirector::HandlePressed);
@@ -148,8 +148,8 @@ void ACoreStageDirector::UpdateCore(float DeltaTime)
 void ACoreStageDirector::HandleViewSolved()
 {
 	BalconyTime = 0.f;
-	const bool bA = ViewA && ViewA->IsSolved();
-	const bool bB = ViewB && ViewB->IsSolved();
+	const bool bA = DiscA && DiscA->IsSolved();
+	const bool bB = DiscB && DiscB->IsSolved();
 	UE_LOG(LogStage5, Log, TEXT("시점 구역: ① %d / ② %d"), bA, bB);
 	if (!bA || !bB || bHasCode)
 	{
@@ -414,7 +414,7 @@ void ACoreStageDirector::RunSelfTest()
 {
 	APawn* Pawn = PuzzleUtils::GetPlayerPawn(this);
 	USceneComponent* Cam = PuzzleUtils::GetPlayerCamera(this);
-	if (!Pawn || !Cam || !Device || !AxisSlot || !TriangleSocket || !SquareSocket || !ViewA || !ViewB)
+	if (!Pawn || !Cam || !Device || !AxisSlot || !TriangleSocket || !SquareSocket || !DiscA || !DiscB)
 	{
 		UE_LOG(LogStage5, Warning, TEXT("pcs.Stage5Test: 플레이어 / 카메라 / 퍼즐 부품 없음"));
 		return;
@@ -448,14 +448,30 @@ void ACoreStageDirector::RunSelfTest()
 	const float FinalWait = LogDuration(LogSquare) + LogDuration(LogFinal) + 3.f;
 	TArray<FStep> Steps = {
 		{ 0.5f, TEXT("S5_0_Hall"), Overview },
-		// 시점 구역: ① ② 자리에서 본 모습 → 둘 다 맞춤
-		{ 1.5f, TEXT("S5_1_ViewA"), [this, LookFrom]() { LookFrom(ViewA->GetActorLocation() + FVector(0.f, 0.f, 160.f), ViewA->LookTarget); } },
-		{ 2.5f, TEXT("S5_2_ViewB"), [this, LookFrom]() { LookFrom(ViewB->GetActorLocation() + FVector(0.f, 0.f, 160.f), ViewB->LookTarget); } },
-		{ 3.0f, nullptr, [this]() {
-			// 관측 위치에 카메라를 두기만 해서 실제 판정으로 풀렸는지 먼저 기록하고, 안 풀린 것만 강제로
-			UE_LOG(LogStage5, Log, TEXT("pcs.Stage5Test: 실제 판정 결과 ① %d / ② %d"), ViewA->IsSolved(), ViewB->IsSolved());
-			ViewA->Solve();
-			ViewB->Solve(); } },
+		// 시점 구역: 원판 앞에 서서 흩어진 그림 → 버튼으로 고리를 돌려 그림을 이음 (실제 버튼 동작과 같은 TurnRing)
+		{ 1.3f, TEXT("S5_1a_DiscA_Scrambled"), [this, LookFrom]() {
+			LookFrom(DiscA->GetActorLocation() + DiscA->GetActorForwardVector() * 170.f, DiscA->GetActorLocation()); } },
+		{ 1.7f, TEXT("S5_1b_DiscB_Scrambled"), [this, LookFrom]() {
+			LookFrom(DiscB->GetActorLocation() + DiscB->GetActorForwardVector() * 170.f, DiscB->GetActorLocation()); } },
+		{ 2.0f, nullptr, [this]() {
+			for (APuzzleRingDisc* Disc : { DiscA.Get(), DiscB.Get() })
+			{
+				// 고리 i를 고리 0과 같은 칸이 될 때까지 돌린다
+				for (int32 i = 1; i < Disc->Rings.Num(); ++i)
+				{
+					const int32 N = Disc->StepsPerTurn;
+					const int32 S0 = Disc->StartSteps.IsValidIndex(0) ? Disc->StartSteps[0] : 0;
+					const int32 Si = Disc->StartSteps.IsValidIndex(i) ? Disc->StartSteps[i] : 0;
+					for (int32 k = 0, Turns = ((S0 - Si) % N + N) % N; k < Turns; ++k)
+					{
+						Disc->TurnRing(i);
+					}
+				}
+			}
+			UE_LOG(LogStage5, Log, TEXT("pcs.Stage5Test: 고리 돌리기 결과 ① %d / ② %d"), DiscA->IsSolved(), DiscB->IsSolved()); } },
+		{ 3.0f, TEXT("S5_2b_DiscB_Solved"), [] {} },
+		{ 3.3f, TEXT("S5_2a_DiscA_Solved"), [this, LookFrom]() {
+			LookFrom(DiscA->GetActorLocation() + DiscA->GetActorForwardVector() * 170.f, DiscA->GetActorLocation()); } },
 		{ 4.5f, TEXT("S5_3_Locker"), [this, LookFrom]() {
 			if (TrianglePart) { LookFrom(TrianglePart->GetActorLocation() + FVector(0.f, -150.f, 40.f), TrianglePart->GetActorLocation()); } } },
 		// 원근법 구역: 코어 축을 슬롯 규격(1.2m)으로 맞춰 슬롯 앞에 놓음

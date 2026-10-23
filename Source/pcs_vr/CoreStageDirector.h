@@ -13,14 +13,14 @@ class APuzzleHandDevice;
 class APuzzleRecorder;
 class APuzzleSign;
 class APuzzleToggleTarget;
-class APuzzleViewPoint;
+class APuzzleRingDisc;
 class UMaterialInstanceDynamic;
 class UPointLightComponent;
 
 /**
  * 5스테이지(L_05_Core, 중앙 코어) 진행 담당. 노션 "5스테이지 퍼즐 설계" 순서:
  * 원근법 구역) 3m 코어 축을 줄여 좁은문(60cm)을 지나 → 코어 ● 슬롯(규격 1.2m)에 맞게 다시 키워 끼움 (판정은 APuzzleBlueprintSlot)
- * 시점 구역) 2층 발코니 관측 위치 ① ◆● / ② ▲■ 를 둘 다 맞추면 → 발코니 보관함이 열려 ▲ 부품 + 코드 ◆●▲■ 기록
+ * 시점 구역) 2층 발코니 관측 원판 ① ◆● / ② ▲■ 의 고리를 돌려 그림을 둘 다 이으면 → 발코니 보관함이 열려 ▲ 부품 + 코드 ◆●▲■ 기록
  * 장치 구역) 4스테이지 손 장치로 코어 제어판 램프에 코드 입력 (틀리면 램프가 모두 꺼짐) → 장치가 풀리고 ■ 부품이 나옴
  * 코어 정지) 부품을 끼울 때마다 음성 기록 #2 / #3 / #4, 세 개가 모이면 맥박이 느려지며 나연의 마지막 음성
  *          → 마지막 음성이 끝난 뒤에 빛이 꺼지고 출구 엘리베이터가 열림
@@ -72,15 +72,15 @@ public:
 	FVector NarrowDoorLocation = FVector::ZeroVector;
 
 	// ---- 시점 구역 ----
-	/** 관측 위치 ① (◆ ●) */
+	/** 관측 원판 ① (◆ ●) */
 	UPROPERTY(EditAnywhere, Category = "Stage5|View")
-	TObjectPtr<APuzzleViewPoint> ViewA;
+	TObjectPtr<APuzzleRingDisc> DiscA;
 
-	/** 관측 위치 ② (▲ ■) */
+	/** 관측 원판 ② (▲ ■) */
 	UPROPERTY(EditAnywhere, Category = "Stage5|View")
-	TObjectPtr<APuzzleViewPoint> ViewB;
+	TObjectPtr<APuzzleRingDisc> DiscB;
 
-	/** 발코니 보관함 문 (둘 다 맞추면 열림) */
+	/** 발코니 보관함 문 (원판 둘 다 맞추면 열림) */
 	UPROPERTY(EditAnywhere, Category = "Stage5|View")
 	TObjectPtr<APuzzleDoor> LockerDoor;
 
