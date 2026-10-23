@@ -21,7 +21,7 @@ L_04_Device (4스테이지: 장치 시험실)를 만든다.
                  북쪽 벽: 왼쪽부터 환풍기 x 510~610 · 칠판 x 200~500 · 모니터 x 70~190
                  서쪽 벽(오른쪽): 한쪽 거울 y 180~480 → 너머에 관찰실 x -280~0 (책상, 의자, 옛 모니터, 관찰 기록)
                  북동쪽 구석: 삼각대 위 관찰 카메라 (빨간 녹화 표시등)
-  출구 엘리베이터 동쪽 벽 y 100~220 너머 (중앙 코어행, L_05 준비 중이라 도착만 하고 출발하지 않음)
+  출구 엘리베이터 동쪽 벽 y 100~220 너머 (중앙 코어행 → L_05_Core)
 """
 import math
 
@@ -449,7 +449,6 @@ prop("FallenChair_Post", CYLINDER, 85, 510, 22, (5, 5, 40), MI_METAL, roll=90.0,
 # ================================================================ 출구: 중앙 코어행 엘리베이터 (동쪽)
 elevator = spawn(unreal.PuzzleElevator, V(W + 120, 160, 0), yaw=180.0, label="S4_Elevator", folder="Puzzle")
 elevator.set_editor_property("next_level", "/Game/VRPuzzle/Maps/L_05_Core")
-elevator.set_editor_property("out_of_service", True)   # L_05 준비 중
 box("Elevator_Stripe", W - 4, W, 100, 220, DOOR_H, DOOR_H + 8, MI_WARN, folder="Geometry/Trim")
 
 # ---------------------------------------------------------------- 글자 (대사 초안)
@@ -457,7 +456,7 @@ sign("S4_Sign_Title", "4. 장치 시험실\n피험 장치 동작 시험", 450, 1
      bg=(0.2, 0.22, 0.25, 1.0), text_color=(0.9, 0.9, 0.85))
 sign("S4_Sign_ArriveDoor", "3. 관측실", 160, -319, 255, yaw=90.0, size=(500, 90), font=34,
      bg=(0.2, 0.22, 0.25, 1.0), text_color=(0.9, 0.9, 0.85))
-sign("S4_Sign_Elevator", "5. 중앙 코어\n(엘리베이터 — 준비 중)", W - 1, 330, 230, yaw=180.0, size=(600, 160), font=34,
+sign("S4_Sign_Elevator", "5. 중앙 코어\n(엘리베이터)", W - 1, 330, 230, yaw=180.0, size=(600, 160), font=34,
      bg=(0.2, 0.22, 0.25, 1.0), text_color=(0.9, 0.9, 0.85))
 sign("S4_Sign_Mirror", "관찰실", -1, 330, 250, yaw=0.0, size=(300, 70), font=30,
      bg=(0.2, 0.22, 0.25, 1.0), text_color=(0.9, 0.9, 0.85))
