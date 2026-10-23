@@ -595,7 +595,7 @@ code_board = sign("S5_CodeBoard", "지도 기록 · 코어 정지 코드\n?  ?  
 # 동쪽 벽 코어 제어판 + 램프 4개 (다이얼 순서 ● ▲ ■ ◆, 플레이어가 보기에 왼쪽부터)
 box("S5_Panel", DX2 - 12, DX2, -170, 170, 95, 245, MI_METAL, folder="Puzzle/Device")
 sign("S5_Sign_Panel", "코어 제어판", DX2 - 13, 0, 228, yaw=180.0, size=(1000, 160), font=90, bg=(0, 0, 0, 0),
-     text_color=(0.06, 0.06, 0.07), folder="Puzzle/Device")
+     text_color=(0.9, 0.88, 0.8), folder="Puzzle/Device")   # 제어판은 녹슨 금속(setup_l05_materials.py)이라 밝은 글씨
 lamps = []
 for i, (sym, ly) in enumerate((("●", -105), ("▲", -35), ("■", 35), ("◆", 105))):
     box("S5_LampHousing_%d" % i, DX2 - 18, DX2 - 12, ly - 22, ly + 22, 160, 204, MI_DARK, folder="Puzzle/Device")
@@ -603,7 +603,7 @@ for i, (sym, ly) in enumerate((("●", -105), ("▲", -35), ("■", 35), ("◆",
                collision=False, movable=True)
     light = point_light("S5_LampLight_%d" % i, DX2 - 60, ly, 182, 6, color=(1.0, 0.65, 0.25), radius=350, shadows=False)
     sign("S5_LampLabel_%d" % i, sym, DX2 - 13, ly, 130, yaw=180.0, size=(300, 300), font=220, ppc=10.0, bg=(0, 0, 0, 0),
-         text_color=(0.06, 0.06, 0.07), folder="Puzzle/Device")
+         text_color=(0.9, 0.88, 0.8), folder="Puzzle/Device")
     lamp = spawn(unreal.PuzzleToggleTarget, V(DX2 - 20, ly, 182), label="S5_Lamp_%d" % i, folder="Puzzle/Device")
     lamp.set_editor_property("display_name", sym + " 램프")
     lamp.set_editor_property("lights", [light])
