@@ -47,6 +47,13 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Interact")
 	float DesktopReach = 350.f;
 
+	/**
+	 * 헤드셋 없이 테스트할 때 카메라 높이 (cm, 바닥부터). VR 폰은 헤드셋이 없으면 카메라가 바닥 높이라
+	 * 눈높이 160cm에 맞춰 만든 시점 맞추기 조각이 모여 보이지 않는다 → 이 높이로 올린다
+	 */
+	UPROPERTY(EditAnywhere, Category = "Interact")
+	float DesktopEyeHeight = 160.f;
+
 	/** 레이로 잡을 수 있는 최대 거리 (cm). 노션 원근법 규칙: 최대 12m */
 	UPROPERTY(EditAnywhere, Category = "Interact|RayGrab")
 	float RayGrabDistance = 1200.f;
@@ -122,6 +129,8 @@ private:
 	TWeakObjectPtr<APuzzleHandDevice> ActiveDevice;
 	TWeakObjectPtr<UEnhancedPlayerInput> PlayerInput;
 	TArray<TWeakObjectPtr<UPuzzleInteractComponent>> Interactables;
+	/** 데스크톱 눈높이를 맞춘 카메라 (레벨이 바뀌어 폰이 새로 생기면 다시 맞춘다) */
+	TWeakObjectPtr<USceneComponent> DesktopEyeCamera;
 	bool bInputReady = false;
 	bool bLeftDown = false;
 	bool bRightDown = false;

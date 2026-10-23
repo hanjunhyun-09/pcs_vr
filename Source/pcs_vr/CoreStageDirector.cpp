@@ -40,7 +40,7 @@ ACoreStageDirector::ACoreStageDirector()
 	PrimaryActorTick.bCanEverTick = true;
 
 	NarrowDoorHintMemo = FText::FromString(TEXT("그대로는 안 들어가.\n일단 작게 만들어."));
-	BalconyHintMemo = FText::FromString(TEXT("난간의 번호판 옆에 서 봐.\n우리가 쓰던 관측 자리야."));
+	BalconyHintMemo = FText::FromString(TEXT("바닥의 동그라미 위에 서서 홀을 내려다봐.\n우리가 쓰던 관측 자리야."));
 	NoCodeHintMemo = FText::FromString(TEXT("코드는 위층 관측 발코니에서\n볼 수 있어."));
 	CodeRecordedMemo = FText::FromString(TEXT("코드 ◆ ● ▲ ■\n지도에 적어 뒀어."));
 }
@@ -451,7 +451,11 @@ void ACoreStageDirector::RunSelfTest()
 		// 시점 구역: ① ② 자리에서 본 모습 → 둘 다 맞춤
 		{ 1.5f, TEXT("S5_1_ViewA"), [this, LookFrom]() { LookFrom(ViewA->GetActorLocation() + FVector(0.f, 0.f, 160.f), ViewA->LookTarget); } },
 		{ 2.5f, TEXT("S5_2_ViewB"), [this, LookFrom]() { LookFrom(ViewB->GetActorLocation() + FVector(0.f, 0.f, 160.f), ViewB->LookTarget); } },
-		{ 3.0f, nullptr, [this]() { ViewA->Solve(); ViewB->Solve(); } },
+		{ 3.0f, nullptr, [this]() {
+			// 관측 위치에 카메라를 두기만 해서 실제 판정으로 풀렸는지 먼저 기록하고, 안 풀린 것만 강제로
+			UE_LOG(LogStage5, Log, TEXT("pcs.Stage5Test: 실제 판정 결과 ① %d / ② %d"), ViewA->IsSolved(), ViewB->IsSolved());
+			ViewA->Solve();
+			ViewB->Solve(); } },
 		{ 4.5f, TEXT("S5_3_Locker"), [this, LookFrom]() {
 			if (TrianglePart) { LookFrom(TrianglePart->GetActorLocation() + FVector(0.f, -150.f, 40.f), TrianglePart->GetActorLocation()); } } },
 		// 원근법 구역: 코어 축을 슬롯 규격(1.2m)으로 맞춰 슬롯 앞에 놓음

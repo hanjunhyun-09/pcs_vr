@@ -89,14 +89,18 @@ void APuzzleViewPoint::Tick(float DeltaTime)
 	const FVector ToTarget = (LookTarget - ViewLoc).GetSafeNormal();
 	const float Dot = FVector::DotProduct(ViewRot.Vector(), ToTarget);
 
-	// 가까울수록, 그리고 목표 쪽을 볼수록 밝게
-	const float Closeness = 1.f - FMath::Clamp(FVector::Dist2D(ViewLoc, GetActorLocation()) / FMath::Max(GlowRadius, 1.f), 0.f, 1.f);
+	// 가까울수록, 그리고 목표 쪽을 볼수록 밝게. 눈높이 판정이면 정답 눈 위치까지의 3D 거리로
+	const bool bEyeMode = DesignEyeHeight > 0.f;
+	const FVector Eye = GetActorLocation() + GetActorUpVector() * DesignEyeHeight;
+	const float Distance = bEyeMode ? FVector::Dist(ViewLoc, Eye) : FVector::Dist2D(ViewLoc, GetActorLocation());
+	const float Closeness = 1.f - FMath::Clamp(Distance / FMath::Max(GlowRadius, 1.f), 0.f, 1.f);
 	const float Facing = FMath::Clamp((Dot - 0.7f) / FMath::Max(MinDot - 0.7f, 0.01f), 0.f, 1.f);
 	ApplyGlow(Closeness * (0.4f + 0.6f * Facing));
 
 	const FVector Local = GetActorTransform().InverseTransformPosition(ViewLoc);
-	const bool bInZone = FMath::Abs(Local.X) <= ZoneSize.X * 0.5f && FMath::Abs(Local.Y) <= ZoneSize.Y * 0.5f
-		&& Local.Z >= 0.f && Local.Z <= ZoneHeight;
+	const bool bInZone = bEyeMode
+		? FVector2D(Local.X, Local.Y).Size() <= ZoneSize.X * 0.5f && FMath::Abs(Local.Z - DesignEyeHeight) <= EyeHeightTolerance
+		: FMath::Abs(Local.X) <= ZoneSize.X * 0.5f && FMath::Abs(Local.Y) <= ZoneSize.Y * 0.5f && Local.Z >= 0.f && Local.Z <= ZoneHeight;
 	if (bInZone && Dot >= MinDot)
 	{
 		Solve();

@@ -35,6 +35,16 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ViewPoint")
 	float ZoneHeight = 200.f;
 
+	/**
+	 * 0보다 크면 눈(카메라)이 바닥에서 이 높이(± EyeHeightTolerance)에 있을 때만 성공 (조각을 이 눈높이에 맞춰 만든 경우).
+	 * 이때 판정 영역은 가운데에서 반지름 ZoneSize.X / 2인 원. 0이면 예전처럼 바닥 ~ ZoneHeight 상자 (3스테이지)
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ViewPoint")
+	float DesignEyeHeight = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ViewPoint")
+	float EyeHeightTolerance = 35.f;
+
 	/** 바라보는 방향 허용치. 0.97 ≈ 14도 이내 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ViewPoint", meta = (ClampMin = "0.5", ClampMax = "1.0"))
 	float MinDot = 0.97f;

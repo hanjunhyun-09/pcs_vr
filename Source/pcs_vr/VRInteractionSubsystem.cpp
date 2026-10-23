@@ -7,7 +7,9 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "EnhancedPlayerInput.h"
+#include "Engine/Engine.h"
 #include "EngineUtils.h"
+#include "IXRTrackingSystem.h"
 #include "HAL/IConsoleManager.h"
 #include "TimerManager.h"
 #include "GameFramework/Pawn.h"
@@ -45,6 +47,21 @@ void UVRInteractionSubsystem::Unregister(UPuzzleInteractComponent* Comp)
 void UVRInteractionSubsystem::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	// 헤드셋 없이 테스트: 바닥 높이에 있는 카메라를 눈높이로 (헤드셋이 있으면 헤드셋이 높이를 정함)
+	const bool bHeadset = GEngine && GEngine->XRSystem.IsValid() && GEngine->XRSystem->IsHeadTrackingAllowed();
+	if (!bHeadset && !DesktopEyeCamera.IsValid())
+	{
+		if (USceneComponent* Cam = PuzzleUtils::GetPlayerCamera(this))
+		{
+			FVector Rel = Cam->GetRelativeLocation();
+			Rel.Z = DesktopEyeHeight;
+			Cam->SetRelativeLocation(Rel);
+			DesktopEyeCamera = Cam;
+			UE_LOG(LogVRInteract, Log, TEXT("헤드셋 없음 → 카메라를 눈높이 %.0fcm로"), DesktopEyeHeight);
+		}
+	}
+
 	if (bInputReady)
 	{
 		UpdateTriggers();

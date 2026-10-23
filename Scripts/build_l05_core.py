@@ -422,7 +422,7 @@ lift_down.set_editor_property("destination", V(-300, 480, 0))
 sign("S5_Sign_LiftUp", "관측 발코니 ↑", 300, 619, BZ - 60, yaw=-90.0, size=(420, 80), font=32, **PLATE)
 sign("S5_Sign_LiftDown", "↓ 홀로 내려가기", -330, 899, BZ + 160, yaw=-90.0, size=(420, 80), font=32, **PLATE)
 
-# 관측 위치 ① ② : 발자국·눈금 없이 난간의 번호판만 (노션)
+# 관측 위치 ① ② : 발자국·눈금 없이 바닥의 번호 동그라미만 (노션은 난간 번호판이었지만 정답 자리가 안 보여서 바닥으로)
 EYE_H = 160.0
 VIEWS = [
     # 이름, 번호판, 관측 위치(바닥), 조각이 모여 보이는 곳, 기호 2개
@@ -484,10 +484,20 @@ for name, number, (vx, vy), (tx, ty, tz), symbols in VIEWS:
     view.set_editor_property("look_target", target)
     view.set_editor_property("pieces", pieces)
     view.set_editor_property("piece_color", unreal.LinearColor(0.95, 0.9, 0.8, 1.0))
+    # 판정: 조각을 맞춰 만든 눈높이(160cm) ± 35cm에 눈이 있을 때만 (기호가 실제로 모여 보일 때만 성공)
+    view.set_editor_property("design_eye_height", EYE_H)
+    view.set_editor_property("zone_size", unreal.Vector2D(80.0, 80.0))   # 반지름 40cm
+    view.set_editor_property("min_dot", 0.95)                            # 약 18도
+    view.set_editor_property("glow_radius", 250.0)
     view_actors.append(view)
-    # 난간 번호판 (관측 위치 옆 난간 아래쪽, 발코니 쪽에서 읽힘. 바로 앞에 두면 시선을 가려 기호가 안 보임)
-    sign("S5_Sign_View" + name, number, vx + (-70.0 if vx < 0 else 70.0), 627, BZ + 75, yaw=90.0, size=(160, 160), font=110,
-         bg=(0.12, 0.13, 0.15, 1.0), text_color=(0.95, 0.9, 0.7), folder="Puzzle/View")
+    # 바닥의 관측 자리 표시 (지름 80cm 원 + 번호). 노션의 '난간 번호판'을 바닥으로 옮김: 정답 자리가 눈에 보이게
+    box("S5_ViewMark_%s_Fill" % name, vx - 40, vx + 40, vy - 40, vy + 40, BZ, BZ + 0.2, MI_DARK, folder="Puzzle/View", collision=False)
+    for i in range(16):
+        a0, a1 = 2 * math.pi * i / 16, 2 * math.pi * (i + 1) / 16
+        pipe("S5_ViewMark_%s_Ring_%02d" % (name, i), V(vx + 40 * math.cos(a0), vy + 40 * math.sin(a0), BZ + 0.6),
+             V(vx + 40 * math.cos(a1), vy + 40 * math.sin(a1), BZ + 0.6), 2.5, MI_PAINT, "Puzzle/View")
+    sign("S5_Sign_View" + name, number, vx, vy, BZ + 0.5, yaw=90.0, pitch=90.0, size=(160, 160), font=120, ppc=4.0,
+         bg=(0, 0, 0, 0), text_color=(0.95, 0.9, 0.7), folder="Puzzle/View")
     log("관측 위치 %s: 조각 %d개" % (number, len(pieces)))
 
 # 발코니 뒤쪽 벽 보관함 (둘 다 맞추면 열림 → ▲ 부품)
