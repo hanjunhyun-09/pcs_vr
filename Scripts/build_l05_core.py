@@ -358,8 +358,7 @@ arrival.set_editor_property("next_level", "")
 spawn(unreal.PlayerStart, V(-130, ELEV_Y - 18, 1), yaw=90.0, label="PlayerStart", folder="Navigation")
 
 exit_elevator = spawn(unreal.PuzzleElevator, V(130, ELEV_Y, 0), yaw=90.0, label="S5_ExitElevator", folder="Puzzle")
-exit_elevator.set_editor_property("next_level", "")
-exit_elevator.set_editor_property("out_of_service", True)   # 마지막 스테이지: 문은 열리지만 출발하지 않음 (엔딩 연출은 나중에)
+exit_elevator.set_editor_property("next_level", "/Game/VRPuzzle/Maps/L_06_Ending")   # 엔딩 컷신 (build_l06_ending.py)
 
 nav = spawn(unreal.NavMeshBoundsVolume, V(-120, -50, 300), label="NavMeshBounds", folder="Navigation")
 nav.set_actor_scale3d(unreal.Vector(3500 / 200.0, 2000 / 200.0, 800 / 200.0))
