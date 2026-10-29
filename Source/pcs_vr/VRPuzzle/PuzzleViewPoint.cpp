@@ -10,7 +10,8 @@ DEFINE_LOG_CATEGORY_STATIC(LogViewPoint, Log, All);
 
 namespace
 {
-	constexpr float FlashTime = 0.6f;
+	// 유니티 빌드에서 PuzzleRingDisc.cpp의 FlashTime과 겹치지 않게 이름을 구분
+	constexpr float ViewPointFlashTime = 0.6f;
 }
 
 APuzzleViewPoint::APuzzleViewPoint()
@@ -67,9 +68,9 @@ void APuzzleViewPoint::Tick(float DeltaTime)
 	{
 		// 한 번 번쩍인 뒤 밝은 채로
 		const float T = GetWorld()->GetTimeSeconds() - SolvedTime;
-		if (T <= FlashTime + DeltaTime)
+		if (T <= ViewPointFlashTime + DeltaTime)
 		{
-			const float Flash = FMath::Sin(FMath::Clamp(T / FlashTime, 0.f, 1.f) * PI);
+			const float Flash = FMath::Sin(FMath::Clamp(T / ViewPointFlashTime, 0.f, 1.f) * PI);
 			ApplyGlow(1.f + Flash);
 		}
 		else
