@@ -52,7 +52,7 @@ struct FEndingShot
 
 /**
  * 엔딩 컷신 진행 담당 (L_06_Ending).
- * 맵이 열리면 플레이어를 숨기고 Shots를 차례로 보여 준 뒤 NextLevel(인트로)로 돌아간다.
+ * 맵이 열리면 플레이어를 숨기고 Shots를 차례로 보여 준 뒤 NextLevel(메인 화면)로 돌아간다.
  * - 카메라 액터로 시점을 바꾸지만, VR에서는 머리 회전이 그대로 적용되고 카메라는 움직이지 않는다 (멀미 방지)
  * - 장면 사이는 페이드로 이어서 시점이 갑자기 바뀌는 느낌을 줄인다
  */
@@ -75,7 +75,7 @@ public:
 
 	/** 컷신이 끝나면 열 레벨 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ending")
-	FName NextLevel = TEXT("/Game/VRPuzzle/Maps/L_00_Intro");
+	FName NextLevel = TEXT("/Game/VRPuzzle/Maps/L_MainMenu");
 
 	UFUNCTION(BlueprintCallable, Category = "Ending")
 	void StartCutscene();

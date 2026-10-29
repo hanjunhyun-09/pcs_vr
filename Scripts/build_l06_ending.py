@@ -24,7 +24,9 @@ L_05_Core 출구 엘리베이터의 다음 레벨도 L_06_Ending 으로 연결�
   2 Door    정문, 셔터가 올라감                            5초
   3 Note    상자 위 세진의 쪽지                            8초
   4 Sky     코어동 돔 위로 구름이 흐르는 하늘              6초
-  5 Credits 크레딧 넘기기                                  16초  → 인트로로
+  5 Credits 크레딧 넘기기                                  16초  → 메인 화면(L_MainMenu)으로
+
+메인 화면(build_main_menu.py)은 이 맵을 복사해서 만들므로, 이 스크립트를 다시 돌렸으면 build_main_menu.py 도 다시 돌린다.
 """
 import math
 import random
@@ -251,8 +253,13 @@ MI_RUST_DARK = surface_mi("MI_VRP_EndRustDark", T_RUST, (0.32, 0.24, 0.18), 120.
 MI_DARK = solid_mi("MI_VRP_EndDark", (0.02, 0.02, 0.022), rough=0.8)
 MI_GLASS = solid_mi("MI_VRP_EndGlass", (0.07, 0.08, 0.075), rough=0.25)
 MI_SHARD = solid_mi("MI_VRP_EndShard", (0.2, 0.22, 0.21), rough=0.2)
-MI_PLANK = solid_mi("MI_VRP_EndPlank", (0.28, 0.2, 0.13), rough=0.95)
-MI_PLANK_OLD = solid_mi("MI_VRP_EndPlankOld", (0.2, 0.17, 0.13), rough=1.0)
+# 오래된 판자: 프로젝트에 나무 질감이 없어서, 갈라진 회반죽·콘크리트 질감을 잘게 깔고 비바람에 바랜 회갈색으로 물들인다
+# (20년 된 나무는 갈색이 빠지고 회색으로 바래며, 아래쪽부터 검게 썩고 물 자국이 흐른다)
+MI_PLANK = surface_mi("MI_VRP_EndPlank", T_PLASTER, (0.38, 0.33, 0.27), 45.0, normal=2.2, grime=0.9, grime_h=400.0,
+                      stain=1.0, streak=1.0, grime_color=(0.12, 0.1, 0.07))
+MI_PLANK_OLD = surface_mi("MI_VRP_EndPlankOld", T_CONCRETE, (0.3, 0.27, 0.23), 40.0, normal=2.0, grime=0.9, grime_h=400.0,
+                          stain=1.0, streak=1.0, grime_color=(0.1, 0.09, 0.06))
+MI_NAIL = solid_mi("MI_VRP_EndNail", (0.12, 0.07, 0.04), rough=0.7)
 MI_GRASS = solid_mi("MI_VRP_EndGrass", (0.13, 0.15, 0.07), rough=1.0)
 MI_WEED = solid_mi("MI_VRP_EndWeed", (0.09, 0.12, 0.04), rough=1.0)
 MI_WEED_DRY = solid_mi("MI_VRP_EndWeedDry", (0.2, 0.17, 0.09), rough=1.0)
@@ -340,9 +347,22 @@ def window(label, x_face, yc, zc, w, h, kind, folder):
         box(label + "_Rust%d" % side, x_face - 3, x_face - 1, yc + side * (w / 2 - 8) - 4, yc + side * (w / 2 - 8) + 4,
             zc - h / 2 - 10 - length, zc - h / 2 - 10, MI_RUST_DARK, folder=folder, shadow=False)
     if kind == "boarded":
-        for k in range(3):
-            obox(label + "_Board%d" % k, (x_face - 6, yc + jitter(0, 10), zc - h / 3 + k * h / 3),
-                 (3, w + 30, 22), MI_PLANK if k % 2 == 0 else MI_PLANK_OLD, folder=folder, roll=jitter(0, 9))
+        # 판자 3~4장: 길이·폭·기울기가 제각각, 한 장은 한쪽 못이 빠져 축 처짐, 판자 끝마다 녹슨 못
+        n = random.randint(3, 4)
+        for k in range(n):
+            length = w + random.uniform(10, 40)
+            width = random.uniform(16, 26)
+            zk = zc - h / 2 + (k + 0.5) * h / n
+            sag = k == n - 1 and random.random() < 0.7
+            roll = random.uniform(25, 40) * random.choice((-1, 1)) if sag else jitter(0, 7)
+            yk = yc + jitter(0, 12) + (length * 0.15 if sag else 0)
+            obox(label + "_Board%d" % k, (x_face - 4 - k * 0.6, yk, zk - (25 if sag else 0)), (2.5, length, width),
+                 random.choice((MI_PLANK, MI_PLANK_OLD)), folder=folder, roll=roll)
+            for end in ((-1,) if sag else (-1, 1)):
+                dy = end * (length / 2 - 8) * math.cos(math.radians(roll))
+                dz = -end * (length / 2 - 8) * math.sin(math.radians(roll))
+                obox(label + "_Nail%d_%d" % (k, end), (x_face - 6.5 - k * 0.6, yk + dy, zk - (25 if sag else 0) + dz), (1.2, 2.2, 2.2),
+                     MI_NAIL, folder=folder, shadow=False)
     elif kind == "broken":
         # 창틀 가장자리에 남은 유리 조각
         for k in range(5):
@@ -380,19 +400,7 @@ for k in range(6):   # 셔터 위 가로 골
 obox("Entry_Tape_A", (-335, 0, 140), (2, 2 * DW + 180, 8), MI_TAPE, folder="Lab/Entry", roll=8)
 obox("Entry_Tape_B", (-335, -DW - 30, 60), (2, 160, 8), MI_TAPE, folder="Lab/Entry", roll=-55)
 
-# 간판: 글자마다 따로, 하나는 떨어져 땅에, 하나는 기울어짐 (20년 방치)
-LETTERS = ["착", "시", " ", "측", "정", " ", "연", "구", "소"]
-for i, ch in enumerate(LETTERS):
-    if ch == " ":
-        continue
-    y = -440 + i * 110
-    if ch == "소":
-        sign("End_Letter_" + str(i), ch, -120, 260, 3, yaw=200.0, pitch=88.0, size=(220, 260), font=200, ppc=2.0,
-             bg=(0, 0, 0, 0), text_color=(0.12, 0.1, 0.08), folder="Story/Letters")
-        continue
-    roll = -14.0 if ch == "구" else jitter(0, 1.5)
-    sign("End_Letter_" + str(i), ch, -27, y, 720 - (12 if ch == "구" else 0), yaw=180.0, roll=roll, size=(220, 260),
-         font=200, ppc=2.0, bg=(0, 0, 0, 0), text_color=(0.12, 0.1, 0.08), folder="Story/Letters")
+# 건물 이름 간판은 두지 않는다 (경고문만)
 sign("End_Warning", "경고: 가스 누출 사고로 인해 출입을 금지합니다.\n2006. 11. 14. 안전관리팀", -27, -DW - 260, 175, yaw=180.0,
      roll=-3.0, size=(700, 260), font=30, bg=(0.62, 0.5, 0.16, 1.0), text_color=(0.08, 0.06, 0.03), folder="Story")
 
@@ -645,7 +653,7 @@ director.set_editor_property("shots", [
     shot(cam_sky, 6.0, end_cam=cam_sky_end, fade_out=1.5, fade_color=(1, 1, 1)),
     shot(cam_credits, 16.0, sign_actor=credits, pages=CREDIT_PAGES, fade_in=1.5, fade_out=1.5, fade_color=(1, 1, 1)),
 ])
-director.set_editor_property("next_level", "/Game/VRPuzzle/Maps/L_00_Intro")
+director.set_editor_property("next_level", "/Game/VRPuzzle/Maps/L_MainMenu")   # 엔딩이 끝나면 메인 화면으로
 
 unreal.EditorLoadingAndSavingUtils.save_map(world, MAP)
 log("L_06_Ending 저장 완료 (액터 %d개)" % len(eas.get_all_level_actors()))
