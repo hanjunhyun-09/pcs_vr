@@ -7,6 +7,7 @@
 #include "Engine/Engine.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "GameFramework/Pawn.h"
@@ -18,6 +19,7 @@
 #include "InputMappingContext.h"
 #include "InputModifiers.h"
 #include "PerspectiveCube.h"
+#include "PuzzleGrabbable.h"
 #include "PuzzleUtils.h"
 #include "VRInteractionSubsystem.h"
 #include "VRSmoothLocomotionSubsystem.h"
@@ -240,21 +242,9 @@ void UDesktopModeSubsystem::OnGrab(const FInputActionValue& Value)
 			// 원근 큐브는 손으로 끌어오면 크기가 안 맞으므로 레이 잡기로 (보이는 크기 유지)
 			break;
 		}
-		UActorComponent* Grab = PuzzleUtils::FindGrabComponent(Target);
-		if (Grab && !PuzzleUtils::IsGrabComponentHeld(Grab))
+		if (GrabWithRightHand(Pawn, Target))
 		{
-			// 손을 물건 위치로 옮겨서 잡는다 → 다음 Tick에 손이 제자리로 오면서 물건을 가져온다
-			USceneComponent* Hand = PuzzleUtils::FindPawnComponent(Pawn, TEXT("MotionControllerRightGrip"));
-			if (Hand)
-			{
-				Hand->SetWorldLocation(Target->GetActorLocation());
-				if (PuzzleUtils::TryGrabWithHand(Grab, Hand))
-				{
-					HeldGrab = Grab;
-					UE_LOG(LogDesktopMode, Log, TEXT("왼쪽 클릭 -> %s 잡기"), *Target->GetName());
-					return;
-				}
-			}
+			return;
 		}
 		const UPrimitiveComponent* Comp = Hit.GetComponent();
 		if (Comp && Comp->GetCollisionObjectType() == ECC_WorldStatic)
@@ -265,4 +255,37 @@ void UDesktopModeSubsystem::OnGrab(const FInputActionValue& Value)
 
 	// 손으로 잡을 게 없으면 멀리 있는 원근 큐브 레이 잡기 (R 키와 같음)
 	Interaction->ToggleDesktopRayGrab();
+	if (Interaction->IsDesktopRayHolding())
+	{
+		return;
+	}
+
+	// 그것도 없으면 허리에 걸린 물건(카드)을 꺼낸다. 허리는 눈 아래 60cm라 데스크톱에서 겨누기 어려우므로
+	// VR에서 손을 허리로 가져가는 동작 대신 이렇게 한다
+	for (TActorIterator<APuzzleGrabbable> It(GetWorld()); It; ++It)
+	{
+		if (It->IsHolstered() && GrabWithRightHand(Pawn, *It))
+		{
+			return;
+		}
+	}
+}
+
+bool UDesktopModeSubsystem::GrabWithRightHand(APawn* Pawn, AActor* Target)
+{
+	UActorComponent* Grab = PuzzleUtils::FindGrabComponent(Target);
+	USceneComponent* Hand = PuzzleUtils::FindPawnComponent(Pawn, TEXT("MotionControllerRightGrip"));
+	if (!Grab || !Hand || PuzzleUtils::IsGrabComponentHeld(Grab))
+	{
+		return false;
+	}
+	// 손을 물건 위치로 옮겨서 잡는다 → 다음 Tick에 손이 제자리로 오면서 물건을 가져온다
+	Hand->SetWorldLocation(Target->GetActorLocation());
+	if (!PuzzleUtils::TryGrabWithHand(Grab, Hand))
+	{
+		return false;
+	}
+	HeldGrab = Grab;
+	UE_LOG(LogDesktopMode, Log, TEXT("왼쪽 클릭 -> %s 잡기"), *Target->GetName());
+	return true;
 }
