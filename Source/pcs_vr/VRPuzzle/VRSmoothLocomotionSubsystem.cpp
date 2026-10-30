@@ -414,6 +414,13 @@ void UVRSmoothLocomotionSubsystem::Tick(float DeltaTime)
 				World->SweepMultiByObjectType(Hits, P, P + Move, FQuat::Identity, Objects, Sphere, Params);
 				for (const FHitResult& H : Hits)
 				{
+					// 이미 살짝 겹쳐 있는 물체(침대 모서리 등)에서 빠져나가는 방향은 막지 않는다.
+					// 안 그러면 한 번 닿은 뒤 어느 쪽으로도 움직일 수 없게 된다.
+					// 구 중심까지 파묻힌 경우(겹친 깊이 >= 반지름)는 빠져나갈 방향을 믿을 수 없어서(벽 반대편으로 뚫고 나감) 그대로 막는다
+					if (H.bStartPenetrating && H.PenetrationDepth < CollisionRadius && FVector::DotProduct(Move, H.Normal) >= 0.f)
+					{
+						continue;
+					}
 					if (IsSolidForPawn(H.GetComponent(), H.GetActor(), Pawn))
 					{
 						OutHit = H;
