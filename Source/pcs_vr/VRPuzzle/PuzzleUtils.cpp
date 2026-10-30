@@ -137,4 +137,42 @@ namespace PuzzleUtils
 			It->DestroyValue_InContainer(Params);
 		}
 	}
+
+	bool TryGrabWithHand(UActorComponent* GrabComp, USceneComponent* Hand)
+	{
+		UFunction* Func = GrabComp ? GrabComp->FindFunction(TEXT("TryGrab")) : nullptr;
+		if (!Func || !Hand)
+		{
+			return false;
+		}
+		// TryGrab(MotionController) → bool. 첫 오브젝트 인자에 손을 넣고, bool 반환값을 읽는다
+		uint8* Params = static_cast<uint8*>(FMemory_Alloca(FMath::Max<int32>(Func->ParmsSize, 1)));
+		FMemory::Memzero(Params, Func->ParmsSize);
+		for (TFieldIterator<FProperty> It(Func); It && It->HasAnyPropertyFlags(CPF_Parm); ++It)
+		{
+			It->InitializeValue_InContainer(Params);
+		}
+		for (TFieldIterator<FObjectProperty> It(Func); It && It->HasAnyPropertyFlags(CPF_Parm); ++It)
+		{
+			if (!It->HasAnyPropertyFlags(CPF_OutParm) && Hand->IsA(It->PropertyClass))
+			{
+				It->SetObjectPropertyValue_InContainer(Params, Hand);
+				break;
+			}
+		}
+		GrabComp->ProcessEvent(Func, Params);
+		bool bGrabbed = false;
+		for (TFieldIterator<FBoolProperty> It(Func); It && It->HasAnyPropertyFlags(CPF_Parm); ++It)
+		{
+			if (It->HasAnyPropertyFlags(CPF_OutParm | CPF_ReturnParm))
+			{
+				bGrabbed = It->GetPropertyValue_InContainer(Params);
+			}
+		}
+		for (TFieldIterator<FProperty> It(Func); It && It->HasAnyPropertyFlags(CPF_Parm); ++It)
+		{
+			It->DestroyValue_InContainer(Params);
+		}
+		return bGrabbed;
+	}
 }

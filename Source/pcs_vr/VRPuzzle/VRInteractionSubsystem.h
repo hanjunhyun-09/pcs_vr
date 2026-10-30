@@ -72,6 +72,10 @@ public:
 	void SetActiveDevice(APuzzleHandDevice* Device);
 	APuzzleHandDevice* GetActiveDevice() const { return ActiveDevice.Get(); }
 
+	/** 데스크톱: 시선 레이로 원근 큐브 잡기 / 놓기 (R 키, 왼쪽 클릭이 손으로 잡을 게 없을 때) */
+	void ToggleDesktopRayGrab() { OnDesktopRayGrab(); }
+	bool IsDesktopRayHolding() const { return DesktopHeld.IsValid(); }
+
 private:
 	void SetupInput(APlayerController* PC);
 	void OnLeftTrigger();

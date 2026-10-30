@@ -365,16 +365,25 @@ void UVRSmoothLocomotionSubsystem::Tick(float DeltaTime)
 		FollowGround(Pawn, Cam);
 	}
 
-	if (FMath::Abs(Axis) < DeadZone)
+	const FRotator Yaw(0.f, Cam->GetComponentRotation().Yaw, 0.f);
+	const FVector Forward = FRotationMatrix(Yaw).GetUnitAxis(EAxis::X);
+	const FVector Right = FRotationMatrix(Yaw).GetUnitAxis(EAxis::Y);
+
+	// 조이스틱(앞/뒤만) + 데스크톱 WASD(앞/뒤/옆)
+	FVector Move = FVector::ZeroVector;
+	if (FMath::Abs(Axis) >= DeadZone)
+	{
+		Move += Forward * FMath::Sign(Axis) * (FMath::Abs(Axis) - DeadZone) / (1.f - DeadZone);
+	}
+	Move += Forward * DesktopMove.Y + Right * DesktopMove.X;
+	if (Move.IsNearlyZero())
 	{
 		ClimbHeldTime = 0.f;
 		return;
 	}
-	Axis = FMath::Sign(Axis) * (FMath::Abs(Axis) - DeadZone) / (1.f - DeadZone);
-
-	const FRotator Yaw(0.f, Cam->GetComponentRotation().Yaw, 0.f);
-	const FVector Dir = FRotationMatrix(Yaw).GetUnitAxis(EAxis::X);
-	FVector Delta = Dir * Axis * MoveSpeed * DeltaTime;
+	Move = Move.GetClampedToMaxSize(1.f);
+	const FVector Dir = Move.GetSafeNormal();
+	FVector Delta = Move * MoveSpeed * DeltaTime;
 
 	// 벽·문에 막히면 멈추고, 비스듬히 부딪히면 벽을 따라 미끄러진다.
 	// - 가슴 높이(바닥에서 최소 120cm, 구 아래쪽이 100cm라 인트로 상자 덮개에 안 걸림): 항상 검사 → 벽·문
@@ -423,7 +432,7 @@ void UVRSmoothLocomotionSubsystem::Tick(float DeltaTime)
 		else
 		{
 			// 앞으로 밀며 막혀 있으면 잠시 뒤 그 윗면으로 올라간다
-			if (bAllowClimb && Axis > 0.f)
+			if (bAllowClimb && FVector::DotProduct(Move, Forward) > 0.f)
 			{
 				ClimbHeldTime += DeltaTime;
 				if (ClimbHeldTime >= ClimbHoldTime)
