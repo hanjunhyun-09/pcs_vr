@@ -20,7 +20,8 @@ struct FInputActionValue;
  * - 왼쪽 클릭: 잡기 / 놓기
  *     원근 큐브 → 시선 레이 잡기 (R 키와 같음, 보이는 크기 유지)
  *     그 밖에 템플릿 GrabComponent가 있는 물건(카드 등) → 오른손으로 잡기
- * - 두 손은 카메라 앞 아래쪽에 둔다. 물건을 든 채 가까운 벽·리더기를 보면 오른손이 그 면까지 뻗는다
+ * - 두 손은 카메라 앞 아래쪽에 둔다. 물건을 든 채 벽·리더기·슬롯을 보면 오른손이 그 면까지 뻗는다
+ *   (그 상태로 놓으면 바라보는 곳에 놓임)
  * E / R / Q 키와 눈높이 보정은 UVRInteractionSubsystem이 맡는다.
  */
 UCLASS()
@@ -47,9 +48,12 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Desktop")
 	float HandReach = 160.f;
 
-	/** 물건을 든 오른손이 바라보는 면까지 뻗는 최대 거리 (cm, 눈에서) */
+	/**
+	 * 물건을 든 오른손이 바라보는 면까지 뻗는 최대 거리 (cm, 눈에서).
+	 * VR에서는 팔을 뻗고 몸을 기울여 닿는 곳도 있어서 넉넉하게 (L_05 코어 슬롯: 받침대 때문에 눈에서 1m 넘게 떨어짐)
+	 */
 	UPROPERTY(EditAnywhere, Category = "Desktop")
-	float HandExtendReach = 70.f;
+	float HandExtendReach = 160.f;
 
 	/** 카메라 기준 손 위치 (앞, 오른쪽, 위) cm. 왼손은 Y를 뒤집는다 */
 	UPROPERTY(EditAnywhere, Category = "Desktop")

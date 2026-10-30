@@ -144,7 +144,7 @@ void UDesktopModeSubsystem::PlaceHands(APawn* Pawn, const USceneComponent* Cam)
 	FVector Right = CamTM.TransformPosition(HandOffset);
 	const FVector Left = CamTM.TransformPosition(FVector(HandOffset.X, -HandOffset.Y, HandOffset.Z));
 
-	// 물건을 든 채 가까운 면(카드 리더기 등)을 보면 오른손을 그 면 바로 앞까지 뻗는다
+	// 물건을 든 채 면(카드 리더기, 코어 슬롯 등)을 보면 오른손을 그 면 바로 앞까지 뻗는다
 	if (HeldGrab.IsValid())
 	{
 		FCollisionQueryParams Params(SCENE_QUERY_STAT(DesktopHandReach), false, Pawn);
