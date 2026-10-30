@@ -1,6 +1,7 @@
 #include "IntroKeycardTrigger.h"
 
 #include "Camera/PlayerCameraManager.h"
+#include "Components/PrimitiveComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/PlayerController.h"
@@ -38,6 +39,13 @@ void UIntroKeycardTrigger::BeginPlay()
 	{
 		UE_LOG(LogIntroKeycard, Warning, TEXT("GrabComponent를 찾지 못했습니다. 이 액터에 GrabComponent가 있어야 합니다."));
 		return;
+	}
+
+	// 메인 화면에서 넘어오면 레벨을 연 첫 프레임이 길어서, 얇은 카드가 물리로 떨어지며 상자의 가짜 바닥(1cm)을 뚫고 밑으로 빠진다.
+	// 잡으면 바로 다음 레벨로 넘어가서 잡기 전에는 물리가 필요 없으므로, 놓인 자리에 고정한다 (잡기는 GrabComponent가 그대로 처리)
+	if (UPrimitiveComponent* Body = Cast<UPrimitiveComponent>(GetOwner()->GetRootComponent()))
+	{
+		Body->SetSimulatePhysics(false);
 	}
 
 	if (UWorld* World = GetWorld())
