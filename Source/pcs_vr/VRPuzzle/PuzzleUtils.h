@@ -38,4 +38,7 @@ namespace PuzzleUtils
 
 	/** GrabComponent의 TryRelease를 불러 손에서 강제로 놓게 한다 */
 	PCS_VR_API void ReleaseGrabComponent(UActorComponent* GrabComp);
+
+	/** GrabComponent의 TryGrab(MotionController)을 Hand로 부른다 (데스크톱 왼쪽 클릭). 잡았으면 true */
+	PCS_VR_API bool TryGrabWithHand(UActorComponent* GrabComp, USceneComponent* Hand);
 }

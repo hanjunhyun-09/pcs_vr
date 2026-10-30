@@ -64,6 +64,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Locomotion|Climb", meta = (ClampMin = "0.0"))
 	float ClimbHoldTime = 0.3f;
 
+	/** 데스크톱 WASD 입력 (X = 오른쪽, Y = 앞, 각각 -1 ~ 1). UDesktopModeSubsystem이 매 프레임 넣는다 */
+	void SetDesktopMove(const FVector2D& Axis) { DesktopMove = Axis; }
+
 private:
 	void SetupInput(class APlayerController* PC);
 	void OnMoveAxis(const FInputActionValue& Value);
@@ -95,6 +98,7 @@ private:
 
 	bool bInputReady = false;
 	float EnhancedAxis = 0.f;
+	FVector2D DesktopMove = FVector2D::ZeroVector;
 	double LastLogTime = 0.0;
 	double LastBlockLogTime = 0.0;
 };
