@@ -4,6 +4,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
+#include "PuzzleSfx.h"
 #include "PuzzleUtils.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -80,6 +81,7 @@ void APuzzleTeleportPad::Tick(float DeltaTime)
 		PuzzleUtils::SetSolidColor(DiscMID, FLinearColor(0.05f, 0.08f, 0.1f), 0.f);
 		Glow->SetVisibility(false);
 		SetActorTickEnabled(false);
+		PuzzleSfx::Play(this, PuzzleSfx::ESfx::PadChime, PadLoc);
 		OnReached.Broadcast();
 	}
 }

@@ -3,6 +3,7 @@
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
+#include "PuzzleSfx.h"
 #include "PuzzleUtils.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -114,6 +115,7 @@ void APuzzleLever::Tick(float DeltaTime)
 		// 내려간 뒤에는 표시등을 끈다 (전원이 방 전체로 넘어감)
 		PuzzleUtils::SetSolidColor(IndicatorMID, FLinearColor(0.05f, 0.2f, 0.07f), 0.f);
 		IndicatorLight->SetVisibility(false);
+		PuzzleSfx::Play(this, PuzzleSfx::ESfx::LeverClunk, GetActorLocation());
 		OnActivated.Broadcast();
 	}
 }

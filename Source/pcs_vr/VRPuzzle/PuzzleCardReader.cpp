@@ -6,6 +6,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "PuzzleGrabbable.h"
+#include "PuzzleSfx.h"
 #include "PuzzleTextWidget.h"
 #include "PuzzleUtils.h"
 #include "TimerManager.h"
@@ -156,12 +157,14 @@ void APuzzleCardReader::CheckCards()
 			bAccepted = true;
 			UpdateLed();
 			ShowMessage(AcceptedMessage, ReaderGreen, 4.f);
+			PuzzleSfx::Play(this, PuzzleSfx::ESfx::Accept, GetActorLocation());
 			OnAccepted.Broadcast();
 			return;
 		}
 
 		UE_LOG(LogCardReader, Log, TEXT("%s: %s 거부"), *GetName(), *CardTag.ToString());
 		ShowMessage(DeniedMessage, ReaderRed, 4.f);
+		PuzzleSfx::Play(this, PuzzleSfx::ESfx::Deny, GetActorLocation());
 		OnDenied.Broadcast();
 	}
 	CardsInRange = MoveTemp(NowInRange);

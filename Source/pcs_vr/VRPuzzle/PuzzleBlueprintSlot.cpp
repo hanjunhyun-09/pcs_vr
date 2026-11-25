@@ -5,6 +5,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "PerspectiveCube.h"
+#include "PuzzleSfx.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogBlueprintSlot, Log, All);
 
@@ -105,5 +106,6 @@ void APuzzleBlueprintSlot::SnapPiece(APerspectiveCube* Piece)
 	Piece->SetActorEnableCollision(false);   // 다시 잡히지 않게
 	Piece->SetAimHighlight(true);
 	UE_LOG(LogBlueprintSlot, Log, TEXT("%s: %s 끼움 (크기 보정 x%.2f)"), *GetName(), *Piece->GetName(), Scale);
+	PuzzleSfx::Play(this, PuzzleSfx::ESfx::Snap, GetActorLocation());
 	OnFilled.Broadcast();
 }

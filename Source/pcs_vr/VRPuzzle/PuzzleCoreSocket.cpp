@@ -3,6 +3,7 @@
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "PuzzleGrabbable.h"
+#include "PuzzleSfx.h"
 #include "PuzzleUtils.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogCoreSocket, Log, All);
@@ -63,5 +64,6 @@ void APuzzleCoreSocket::SnapPart(APuzzleGrabbable* Part)
 	Part->Emissive = FMath::Max(Part->Emissive, 2.f);
 	PuzzleUtils::ApplySolidColor(Part->GetMesh(), Part->Color, Part->Emissive);
 	UE_LOG(LogCoreSocket, Log, TEXT("%s: %s 끼움"), *GetName(), *Part->GetName());
+	PuzzleSfx::Play(this, PuzzleSfx::ESfx::Snap, GetActorLocation());
 	OnFilled.Broadcast();
 }

@@ -2,6 +2,7 @@
 
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
+#include "PuzzleSfx.h"
 #include "PuzzleUtils.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -44,12 +45,20 @@ void APuzzleDoor::ApplyPanel(float Amount)
 
 void APuzzleDoor::Open()
 {
+	if (!bTargetOpen)
+	{
+		PuzzleSfx::Play(this, PuzzleSfx::ESfx::DoorOpen, Panel->GetComponentLocation());
+	}
 	bTargetOpen = true;
 	SetActorTickEnabled(true);
 }
 
 void APuzzleDoor::Close()
 {
+	if (bTargetOpen)
+	{
+		PuzzleSfx::Play(this, PuzzleSfx::ESfx::DoorOpen, Panel->GetComponentLocation());
+	}
 	bTargetOpen = false;
 	SetActorTickEnabled(true);
 }

@@ -5,6 +5,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "PerspectiveCube.h"
+#include "PuzzleSfx.h"
 #include "PuzzleUtils.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -83,6 +84,7 @@ void APuzzlePressurePlate::Tick(float DeltaTime)
 				TargetDepth = PressedDepth;
 				PuzzleUtils::SetSolidColor(PlateMID, PressedColor, 1.5f);
 				UE_LOG(LogPressurePlate, Log, TEXT("%s: %s (배율 %.2f)로 눌림"), *GetName(), *Cube->GetName(), Cube->GetScaleRatio());
+				PuzzleSfx::Play(this, PuzzleSfx::ESfx::PlateThud, GetActorLocation());
 				OnPressed.Broadcast();
 				break;
 			}

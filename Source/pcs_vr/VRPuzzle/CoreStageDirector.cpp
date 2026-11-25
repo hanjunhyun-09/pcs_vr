@@ -15,6 +15,7 @@
 #include "PuzzleGrabbable.h"
 #include "PuzzleHandDevice.h"
 #include "PuzzleRecorder.h"
+#include "PuzzleSfx.h"
 #include "PuzzleSign.h"
 #include "PuzzleToggleTarget.h"
 #include "PuzzleUtils.h"
@@ -323,6 +324,7 @@ void ACoreStageDirector::Finish()
 {
 	UE_LOG(LogStage5, Log, TEXT("5스테이지 클리어 → 코어 빛이 꺼지고 출구 엘리베이터 열림"));
 	bFinished = true;
+	PuzzleSfx::Play2D(this, PuzzleSfx::ESfx::CoreShutdown);
 	if (ExitElevator)
 	{
 		ExitElevator->Arrive();

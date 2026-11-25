@@ -5,6 +5,7 @@
 #include "Engine/World.h"
 #include "PerspectiveCube.h"
 #include "PuzzleInteractComponent.h"
+#include "PuzzleSfx.h"
 #include "PuzzleUtils.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -70,7 +71,11 @@ void APuzzleDispenser::BeginPlay()
 
 void APuzzleDispenser::HandleInteract(AActor* InteractInstigator)
 {
-	Dispense();
+	// 소리는 플레이어가 버튼을 눌렀을 때만 (맵 시작 때 자동으로 나오는 큐브는 조용히)
+	if (Dispense())
+	{
+		PuzzleSfx::Play(this, PuzzleSfx::ESfx::Dispense, GetActorLocation() + FVector(0.f, 0.f, PedestalHeight));
+	}
 }
 
 APerspectiveCube* APuzzleDispenser::Dispense()

@@ -4,6 +4,7 @@
 #include "Engine/World.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "PuzzleButton.h"
+#include "PuzzleSfx.h"
 #include "PuzzleUtils.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRingDisc, Log, All);
@@ -92,6 +93,7 @@ void APuzzleRingDisc::TurnRing(int32 Index)
 	}
 	Current[Index] = (Current[Index] + 1) % StepsPerTurn;
 	Target[Index] += 360.f / StepsPerTurn;   // 늘 같은 방향으로 돈다 (보이는 각도는 360을 넘어가도 됨)
+	PuzzleSfx::Play(this, PuzzleSfx::ESfx::RingTurn, GetActorLocation());
 	UE_LOG(LogRingDisc, Log, TEXT("%s: 고리 %d → %d칸"), *GetName(), Index, Current[Index]);
 	CheckSolved();
 }
@@ -123,6 +125,7 @@ void APuzzleRingDisc::CheckSolved()
 	}
 	UE_LOG(LogRingDisc, Log, TEXT("%s: 그림이 이어짐 → 성공"), *GetName());
 	SolvedTime = GetWorld()->GetTimeSeconds() + TurnTime * 2.f;   // 바로 서는 동안 기다렸다가 번쩍
+	PuzzleSfx::Play(this, PuzzleSfx::ESfx::Success, GetActorLocation());
 	OnSolved.Broadcast();
 }
 

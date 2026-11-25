@@ -2,6 +2,7 @@
 
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
+#include "PuzzleSfx.h"
 #include "PuzzleUtils.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -83,6 +84,7 @@ void APuzzleButton::Press()
 	}
 	bReturnAfterPress = !bOneShot;
 	StartMove(PressedX, 0.08f);
+	PuzzleSfx::Play(this, PuzzleSfx::ESfx::Click, GetActorLocation());
 	OnPressed.Broadcast();
 }
 

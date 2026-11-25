@@ -6,6 +6,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
+#include "PuzzleSfx.h"
 #include "PuzzleTextWidget.h"
 #include "PuzzleUtils.h"
 #include "TimerManager.h"
@@ -214,6 +215,7 @@ void APuzzleKeypad::PressKey(const FString& Symbol)
 	FlashIndex = Keys.IndexOfByPredicate([&](const UPuzzleKeypadKey* K) { return K && K->Symbol == Symbol; });
 	FlashUntil = GetWorld()->GetTimeSeconds() + 0.2;
 	RefreshKeyColors();
+	PuzzleSfx::Play(this, PuzzleSfx::ESfx::Beep, GetActorLocation(), 0.8f);
 
 	if (bShowingError)
 	{
@@ -252,6 +254,7 @@ void APuzzleKeypad::PressKey(const FString& Symbol)
 		{
 			PuzzleUtils::SetSolidColor(MID, KeyPressColor, 1.f);
 		}
+		PuzzleSfx::Play(this, PuzzleSfx::ESfx::Success, GetActorLocation());
 		OnSolved.Broadcast();
 	}
 	else
@@ -260,6 +263,7 @@ void APuzzleKeypad::PressKey(const FString& Symbol)
 		UE_LOG(LogKeypad, Log, TEXT("%s: 틀림 (%s)"), *GetName(), *Input);
 		bShowingError = true;
 		UpdateDisplay();
+		PuzzleSfx::Play(this, PuzzleSfx::ESfx::Deny, GetActorLocation());
 		OnWrongCode.Broadcast();
 		GetWorldTimerManager().SetTimer(ErrorHandle, this, &APuzzleKeypad::ClearInput, 1.2f, false);
 	}

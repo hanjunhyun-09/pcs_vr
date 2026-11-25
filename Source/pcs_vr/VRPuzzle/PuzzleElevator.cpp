@@ -8,6 +8,7 @@
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
+#include "PuzzleSfx.h"
 #include "PuzzleTextWidget.h"
 #include "PuzzleUtils.h"
 #include "TimerManager.h"
@@ -138,6 +139,7 @@ void APuzzleElevator::HandleCall(AActor* InteractInstigator)
 	if (State == EState::Waiting)
 	{
 		// 눌러도 아직 안 옴 (큐브를 키우거나 시간이 지나면 도착)
+		PuzzleSfx::Play(this, PuzzleSfx::ESfx::Click, GetActorLocation());
 		SetDisplay(TEXT("호출됨 · 대기 중…"), FLinearColor(1.f, 0.6f, 0.1f));
 	}
 }
@@ -158,6 +160,7 @@ void APuzzleElevator::Arrive()
 	{
 		SetDisplay(TEXT("도착"), FLinearColor(0.3f, 1.f, 0.4f));
 	}
+	PuzzleSfx::Play(this, PuzzleSfx::ESfx::ElevatorDing, GetActorLocation());
 	OnArrived.Broadcast();
 }
 
