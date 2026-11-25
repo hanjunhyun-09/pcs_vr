@@ -91,7 +91,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Stage1|Hints", meta = (MultiLine = "true"))
 	FText CubeGrownMemo;
 
-	/** 지도 메모를 눈앞에 띄운다 (손목 지도 위젯이 생기기 전 임시 방식) */
+	/** 지도 메모를 눈앞에 잠깐 띄우고 손목 지도(UWristMapSubsystem)에도 남긴다 */
 	UFUNCTION(BlueprintCallable, Category = "Stage1")
 	void ShowMemo(const FText& Memo, float Duration = 6.f);
 

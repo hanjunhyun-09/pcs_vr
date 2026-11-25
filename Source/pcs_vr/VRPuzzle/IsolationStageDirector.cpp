@@ -12,6 +12,7 @@
 #include "PuzzleSign.h"
 #include "PuzzleTeleportPad.h"
 #include "PuzzleUtils.h"
+#include "WristMap.h"
 #include "TimerManager.h"
 #include "VRSmoothLocomotionSubsystem.h"
 
@@ -192,6 +193,11 @@ void AIsolationStageDirector::ElevatorFallback()
 
 void AIsolationStageDirector::ShowMemo(const FText& Memo, float Duration)
 {
+	// 눈앞에 잠깐 띄우고, 손목 지도에도 남긴다 (왼손목 / Tab으로 다시 보기)
+	if (UWristMapSubsystem* WristMap = UWristMapSubsystem::Get(this))
+	{
+		WristMap->AddMemo(Memo, this);
+	}
 	USceneComponent* Cam = PuzzleUtils::GetPlayerCamera(this);
 	if (!MemoSign || !Cam)
 	{
