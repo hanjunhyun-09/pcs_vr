@@ -21,7 +21,7 @@ APerspectiveStageDirector::APerspectiveStageDirector()
 	PrimaryActorTick.bCanEverTick = true;
 
 	ArrivalMemo = FText::FromString(TEXT("통로 전원 스위치는 높은 선반 위에 있어."));
-	ShelfHintMemo = FText::FromString(TEXT("멀리 보고 놓으면 커져. 1층 엘리베이터 앞에서처럼."));
+	ShelfHintMemo = FText::FromString(TEXT("멀리 보고 놓으면 커져. 격리실 엘리베이터 앞에서처럼."));
 	ClimbHintMemo = FText::FromString(TEXT("큰 큐브는 밟고 올라갈 수 있어.\n큐브 앞에서 조이스틱을 앞으로 계속 밀어 봐."));
 	BoxHintMemo = FText::FromString(TEXT("가까이선 너무 커. 멀리서 보면 작아 보이지 않아?"));
 	PlateHintMemo = FText::FromString(TEXT("가벼운 건 안 돼. 크고 무거운 게 필요해."));

@@ -639,7 +639,7 @@ cam_credits = camera("Cam5_Credits", (CREDIT_POS[0] - 400, 0, CREDIT_POS[2]), CR
 
 CREDIT_PAGES = [
     "착시 측정 연구소\n\n컴과고 VR 프로젝트",
-    "기획 · 개발\n\n(이름을 적어 주세요)",
+    "기획 · 개발\n\n한준현",
     "등장인물\n\n강한결\n오세진\n오나연\n권혁수",
     "만든 도구\n\nUnreal Engine 5\nVR Template\nOpenXR",
     "플레이해 주셔서 감사합니다",
