@@ -312,6 +312,13 @@ void UVRSmoothLocomotionSubsystem::SetupInput(APlayerController* PC)
 		UE_LOG(LogVRLocomotion, Warning, TEXT("IA_Turn을 찾지 못했습니다. 부드러운 회전을 쓸 수 없습니다."));
 	}
 
+	// 옆걸음(왼쪽 스틱 좌/우). 없으면 앞뒤로만 움직인다 (Scripts/setup_locomotion_input.py가 만든다)
+	StrafeAction = LoadObject<UInputAction>(nullptr, TEXT("/Game/VRPuzzle/Input/IA_Strafe.IA_Strafe"));
+	if (!StrafeAction)
+	{
+		UE_LOG(LogVRLocomotion, Warning, TEXT("IA_Strafe를 찾지 못했습니다. 옆걸음/대각선 이동을 쓸 수 없습니다."));
+	}
+
 	EIC->BindAction(MoveAction, ETriggerEvent::Triggered, this, &UVRSmoothLocomotionSubsystem::OnMoveAxis);
 	EIC->BindAction(MoveAction, ETriggerEvent::Completed, this, &UVRSmoothLocomotionSubsystem::OnMoveEnd);
 	EIC->BindAction(MoveAction, ETriggerEvent::Canceled, this, &UVRSmoothLocomotionSubsystem::OnMoveEnd);
@@ -383,6 +390,7 @@ void UVRSmoothLocomotionSubsystem::Tick(float DeltaTime)
 	// 이벤트로 받은 값과, 입력 시스템에서 직접 읽은 IA_Move 값 중 큰 쪽을 쓴다
 	float Polled = 0.f;
 	float TurnAxis = 0.f;
+	float StrafeAxis = 0.f;
 	if (const ULocalPlayer* LP = PC->GetLocalPlayer())
 	{
 		if (UEnhancedInputLocalPlayerSubsystem* InSys = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
@@ -397,16 +405,21 @@ void UVRSmoothLocomotionSubsystem::Tick(float DeltaTime)
 				{
 					TurnAxis = EnhancedInput->GetActionValue(TurnAction).Get<float>();
 				}
+				if (StrafeAction)
+				{
+					StrafeAxis = EnhancedInput->GetActionValue(StrafeAction).Get<float>();
+				}
 			}
 		}
 	}
 	float Axis = FMath::Abs(EnhancedAxis) > FMath::Abs(Polled) ? EnhancedAxis : Polled;
 
 	static double LastAxisLog = 0.0;
-	if (Now - LastAxisLog > 1.0 && FMath::Abs(Axis) > 0.05f)
+	if (Now - LastAxisLog > 1.0 && (FMath::Abs(Axis) > 0.05f || FMath::Abs(StrafeAxis) > 0.05f || FMath::Abs(TurnAxis) > 0.05f))
 	{
 		LastAxisLog = Now;
-		UE_LOG(LogVRLocomotion, Log, TEXT("IA_Move 값: 이벤트=%.2f 직접읽기=%.2f"), EnhancedAxis, Polled);
+		UE_LOG(LogVRLocomotion, Log, TEXT("입력 값: 앞뒤=%.2f (이벤트 %.2f / 직접읽기 %.2f) 좌우=%.2f 회전=%.2f"),
+			Axis, EnhancedAxis, Polled, StrafeAxis, TurnAxis);
 	}
 
 	const UCameraComponent* Cam = Pawn->FindComponentByClass<UCameraComponent>();
@@ -431,11 +444,16 @@ void UVRSmoothLocomotionSubsystem::Tick(float DeltaTime)
 	const FVector Forward = FRotationMatrix(Yaw).GetUnitAxis(EAxis::X);
 	const FVector Right = FRotationMatrix(Yaw).GetUnitAxis(EAxis::Y);
 
-	// 조이스틱(앞/뒤만) + 데스크톱 WASD(앞/뒤/옆)
+	// 왼쪽 조이스틱(앞뒤 + 좌우) + 데스크톱 WASD(앞/뒤/옆)
+	// 데드존은 두 축을 합친 기울기로 판단한다 (원형 데드존) → 대각선도 자연스럽게, 방향은 그대로 유지
 	FVector Move = FVector::ZeroVector;
-	if (FMath::Abs(Axis) >= DeadZone)
+	const FVector2D Stick(StrafeAxis, Axis);
+	const float StickLen = Stick.Size();
+	if (StickLen >= DeadZone && StickLen > KINDA_SMALL_NUMBER)
 	{
-		Move += Forward * FMath::Sign(Axis) * (FMath::Abs(Axis) - DeadZone) / (1.f - DeadZone);
+		const float Strength = FMath::Min((StickLen - DeadZone) / (1.f - DeadZone), 1.f);
+		const FVector2D StickDir = Stick / StickLen;
+		Move += (Forward * StickDir.Y + Right * StickDir.X) * Strength;
 	}
 	Move += Forward * DesktopMove.Y + Right * DesktopMove.X;
 	if (Move.IsNearlyZero())

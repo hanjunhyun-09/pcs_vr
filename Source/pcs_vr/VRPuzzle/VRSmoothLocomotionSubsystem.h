@@ -9,10 +9,11 @@ class UInputAction;
 struct FInputActionValue;
 
 /**
- * VR 템플릿 폰(VRPawn)을 왼쪽 조이스틱(위/아래)으로 부드럽게 이동시킨다.
+ * VR 템플릿 폰(VRPawn)을 왼쪽 조이스틱(앞뒤 + 좌우, 대각선 포함)으로 부드럽게 이동시킨다.
  * - 이동 방향: 헤드셋이 바라보는 방향(수평)
  * - 템플릿이 같은 입력(IA_Move)으로 하던 텔레포트는 막는다
- * - 스틱 배치는 IMC_Default에서 정한다 (Scripts/swap_locomotion_sticks.py: 이동 = 왼쪽, 회전 = 오른쪽)
+ * - 스틱 배치는 IMC_Default에서 정한다 (Scripts/swap_locomotion_sticks.py: 이동 = 왼쪽, 회전 = 오른쪽,
+ *   Scripts/setup_locomotion_input.py: 옆걸음 IA_Strafe 추가 + 입력 액션의 데드존 제거 → 데드존은 여기서 처리)
  * - 이동 앞쪽에 벽이 있으면 멈춘다
  * - 오른쪽 조이스틱 좌/우로 부드럽게 회전한다 (템플릿의 45도 스냅 회전은 끈다)
  * 게임 월드에서 자동으로 생성되며, VRPawn이 없으면 아무 일도 하지 않는다.
@@ -34,9 +35,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Locomotion")
 	float MoveSpeed = 140.f;
 
-	/** 조이스틱 데드존 (0~1) */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Locomotion")
-	float DeadZone = 0.25f;
+	/** 이동 조이스틱 데드존 (0~1, 앞뒤·좌우를 합친 기울기 기준) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Locomotion", meta = (ClampMin = "0.0", ClampMax = "0.95"))
+	float DeadZone = 0.15f;
 
 	/** 벽 충돌 검사 반지름 (cm). 0이면 충돌 검사를 하지 않는다. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Locomotion")
@@ -72,11 +73,11 @@ public:
 
 	/** 조이스틱을 끝까지 밀었을 때의 회전 속도 (도/초) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Locomotion|Turn", meta = (ClampMin = "0.0"))
-	float TurnSpeed = 90.f;
+	float TurnSpeed = 120.f;
 
 	/** 회전 조이스틱 데드존 (0~1) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Locomotion|Turn", meta = (ClampMin = "0.0", ClampMax = "0.95"))
-	float TurnDeadZone = 0.2f;
+	float TurnDeadZone = 0.15f;
 
 	/** 데스크톱 WASD 입력 (X = 오른쪽, Y = 앞, 각각 -1 ~ 1). UDesktopModeSubsystem이 매 프레임 넣는다 */
 	void SetDesktopMove(const FVector2D& Axis) { DesktopMove = Axis; }
@@ -117,6 +118,10 @@ private:
 	/** 템플릿의 회전 입력 (오른쪽 조이스틱 좌/우). 값만 읽는다 */
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> TurnAction;
+
+	/** 옆걸음 입력 (왼쪽 조이스틱 좌/우, /Game/VRPuzzle/Input/IA_Strafe) */
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> StrafeAction;
 
 	/** 템플릿 VRPawn에 원래 설정돼 있던 SnapTurnDegrees (되돌리기용). Max 값이면 아직 읽지 않음 */
 	double OriginalSnapTurnDegrees = TNumericLimits<double>::Max();
