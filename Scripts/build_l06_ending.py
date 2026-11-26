@@ -24,7 +24,7 @@ L_05_Core 출구 엘리베이터의 다음 레벨도 L_06_Ending 으로 연결�
   2 Door    정문, 셔터가 올라감                            5초
   3 Note    상자 위 세진의 쪽지                            8초
   4 Sky     코어동 돔 위로 구름이 흐르는 하늘              6초
-  5 Credits 크레딧 넘기기                                  16초  → 메인 화면(L_MainMenu)으로
+  5 Credits 크레딧 넘기기                                  19초  → 메인 화면(L_MainMenu)으로
 
 메인 화면(build_main_menu.py)은 이 맵을 복사해서 만들므로, 이 스크립트를 다시 돌렸으면 build_main_menu.py 도 다시 돌린다.
 """
@@ -640,6 +640,7 @@ cam_credits = camera("Cam5_Credits", (CREDIT_POS[0] - 400, 0, CREDIT_POS[2]), CR
 CREDIT_PAGES = [
     "착시 측정 연구소\n\n컴과고 VR 프로젝트",
     "기획 · 개발\n\n한준현",
+    "한 거 없는 사람\n\n이하음",
     "등장인물\n\n강한결\n오세진\n오나연\n권혁수",
     "만든 도구\n\nUnreal Engine 5\nVR Template\nOpenXR",
     "플레이해 주셔서 감사합니다",
@@ -651,7 +652,7 @@ director.set_editor_property("shots", [
     shot(cam_door, 5.0, move_actor=shutter, move_offset=(0, 0, DH - 20)),
     shot(cam_note, 8.0, sign_actor=note),
     shot(cam_sky, 6.0, end_cam=cam_sky_end, fade_out=1.5, fade_color=(1, 1, 1)),
-    shot(cam_credits, 16.0, sign_actor=credits, pages=CREDIT_PAGES, fade_in=1.5, fade_out=1.5, fade_color=(1, 1, 1)),
+    shot(cam_credits, 19.0, sign_actor=credits, pages=CREDIT_PAGES, fade_in=1.5, fade_out=1.5, fade_color=(1, 1, 1)),
 ])
 director.set_editor_property("next_level", "/Game/VRPuzzle/Maps/L_MainMenu")   # 엔딩이 끝나면 메인 화면으로
 

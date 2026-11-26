@@ -11,10 +11,12 @@ MAP = "/Game/VRPuzzle/Maps/L_06_Ending"
 CREDIT_PAGES = [
     "착시 측정 연구소\n\n컴과고 VR 프로젝트",
     "기획 · 개발\n\n한준현",
+    "한 거 없는 사람\n\n이하음",
     "등장인물\n\n강한결\n오세진\n오나연\n권혁수",
     "만든 도구\n\nUnreal Engine 5\nVR Template\nOpenXR",
     "플레이해 주셔서 감사합니다",
 ]
+CREDIT_DURATION = 19.0   # 쪽마다 약 3초 (build_l06_ending.py의 크레딧 장면 길이와 같게)
 
 eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
@@ -29,6 +31,7 @@ for a in eas.get_all_level_actors():
     for s in shots:
         if len(s.get_editor_property("pages")) > 0:
             s.set_editor_property("pages", [unreal.Text(t) for t in CREDIT_PAGES])
+            s.set_editor_property("duration", CREDIT_DURATION)
             done += 1
     a.set_editor_property("shots", shots)
 
