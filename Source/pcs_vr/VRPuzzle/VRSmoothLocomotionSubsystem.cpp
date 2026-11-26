@@ -64,7 +64,7 @@ float UVRSmoothLocomotionSubsystem::ReadRawStick(APlayerController* PC) const
 
 void UVRSmoothLocomotionSubsystem::DisableTemplateTeleport(APawn* Pawn)
 {
-	// 템플릿 VRPawn은 같은 IA_Move(오른쪽 스틱)로 텔레포트한다.
+	// 템플릿 VRPawn은 같은 IA_Move(이동 스틱, IMC_Default에서 왼쪽 스틱 위/아래)로 텔레포트한다.
 	// OpenXR 때문에 입력을 가로챌 수 없어서, 매 프레임 끝에 "텔레포트 위치가 유효함" 값을 꺼 둔다.
 	// → 스틱을 놓을 때(Completed) 템플릿이 확인하는 값이 항상 false라서 텔레포트가 일어나지 않는다.
 	// (이 서브시스템의 Tick은 입력 처리와 폰 Tick보다 뒤에 실행됨)
@@ -88,6 +88,48 @@ void UVRSmoothLocomotionSubsystem::DisableTemplateTeleport(APawn* Pawn)
 			Visualizer->SetActorHiddenInGame(true);
 		}
 	}
+}
+
+void UVRSmoothLocomotionSubsystem::UpdateTemplateSnapTurn(APawn* Pawn)
+{
+	// 템플릿 VRPawn은 IA_Turn(오른쪽 스틱 좌/우)을 받으면 SnapTurnDegrees만큼 한 번에 돌린다.
+	// 부드러운 회전을 쓸 때는 이 값을 0으로 만들어 스냅 회전이 아무 일도 하지 않게 한다.
+	// (블루프린트 float 변수는 UE5에서 double일 수 있어서 숫자 속성으로 다룬다)
+	const FNumericProperty* SnapProp = FindFProperty<FNumericProperty>(Pawn->GetClass(), TEXT("SnapTurnDegrees"));
+	if (!SnapProp || !SnapProp->IsFloatingPoint())
+	{
+		return;
+	}
+	void* ValuePtr = SnapProp->ContainerPtrToValuePtr<void>(Pawn);
+	if (OriginalSnapTurnDegrees == TNumericLimits<double>::Max())
+	{
+		OriginalSnapTurnDegrees = SnapProp->GetFloatingPointPropertyValue(ValuePtr);
+		UE_LOG(LogVRLocomotion, Log, TEXT("템플릿 스냅 회전 각도: %.0f도 (부드러운 회전 %s)"),
+			OriginalSnapTurnDegrees, bSmoothTurn ? TEXT("켜짐") : TEXT("꺼짐"));
+	}
+	const double Wanted = bSmoothTurn ? 0.0 : OriginalSnapTurnDegrees;
+	if (SnapProp->GetFloatingPointPropertyValue(ValuePtr) != Wanted)
+	{
+		SnapProp->SetFloatingPointPropertyValue(ValuePtr, Wanted);
+	}
+}
+
+void UVRSmoothLocomotionSubsystem::ApplySmoothTurn(APawn* Pawn, const UCameraComponent* Cam, float TurnAxis, float DeltaTime)
+{
+	const float Abs = FMath::Abs(TurnAxis);
+	if (Abs < TurnDeadZone || TurnSpeed <= 0.f)
+	{
+		return;
+	}
+	// 데드존 밖에서 0부터 천천히 커지도록 (살짝 밀면 느리게, 끝까지 밀면 TurnSpeed)
+	const float Strength = FMath::Min((Abs - TurnDeadZone) / (1.f - TurnDeadZone), 1.f);
+	const float YawDelta = FMath::Sign(TurnAxis) * Strength * TurnSpeed * DeltaTime;
+
+	// 폰 원점이 아니라 머리(카메라) 위치를 중심으로 돌린다. 안 그러면 방 안에서 몸이 원을 그리며 밀려난다
+	const FVector Pivot = Cam->GetComponentLocation();
+	const FQuat Rot(FVector::UpVector, FMath::DegreesToRadians(YawDelta));
+	const FVector NewLoc = Pivot + Rot.RotateVector(Pawn->GetActorLocation() - Pivot);
+	Pawn->SetActorLocationAndRotation(NewLoc, Rot * Pawn->GetActorQuat(), false, nullptr, ETeleportType::None);
 }
 
 bool UVRSmoothLocomotionSubsystem::IsSolidForPawn(const UPrimitiveComponent* Comp, const AActor* Actor, const APawn* Pawn) const
@@ -263,6 +305,13 @@ void UVRSmoothLocomotionSubsystem::SetupInput(APlayerController* PC)
 	}
 	MoveAction = TemplateMove;
 
+	// 회전 입력(IA_Turn)도 값만 읽는다. 없으면 부드러운 회전만 동작하지 않는다
+	TurnAction = LoadObject<UInputAction>(nullptr, TEXT("/Game/VRTemplate/Input/Actions/IA_Turn.IA_Turn"));
+	if (!TurnAction)
+	{
+		UE_LOG(LogVRLocomotion, Warning, TEXT("IA_Turn을 찾지 못했습니다. 부드러운 회전을 쓸 수 없습니다."));
+	}
+
 	EIC->BindAction(MoveAction, ETriggerEvent::Triggered, this, &UVRSmoothLocomotionSubsystem::OnMoveAxis);
 	EIC->BindAction(MoveAction, ETriggerEvent::Completed, this, &UVRSmoothLocomotionSubsystem::OnMoveEnd);
 	EIC->BindAction(MoveAction, ETriggerEvent::Canceled, this, &UVRSmoothLocomotionSubsystem::OnMoveEnd);
@@ -333,6 +382,7 @@ void UVRSmoothLocomotionSubsystem::Tick(float DeltaTime)
 
 	// 이벤트로 받은 값과, 입력 시스템에서 직접 읽은 IA_Move 값 중 큰 쪽을 쓴다
 	float Polled = 0.f;
+	float TurnAxis = 0.f;
 	if (const ULocalPlayer* LP = PC->GetLocalPlayer())
 	{
 		if (UEnhancedInputLocalPlayerSubsystem* InSys = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
@@ -342,6 +392,10 @@ void UVRSmoothLocomotionSubsystem::Tick(float DeltaTime)
 				if (MoveAction)
 				{
 					Polled = EnhancedInput->GetActionValue(MoveAction).Get<float>();
+				}
+				if (TurnAction)
+				{
+					TurnAxis = EnhancedInput->GetActionValue(TurnAction).Get<float>();
 				}
 			}
 		}
@@ -360,6 +414,14 @@ void UVRSmoothLocomotionSubsystem::Tick(float DeltaTime)
 	{
 		return;
 	}
+
+	// 회전을 먼저 해서, 아래 이동 방향이 이번 프레임에 돌아간 시선을 따르게 한다
+	UpdateTemplateSnapTurn(Pawn);
+	if (bSmoothTurn)
+	{
+		ApplySmoothTurn(Pawn, Cam, TurnAxis, DeltaTime);
+	}
+
 	if (bAllowClimb)
 	{
 		FollowGround(Pawn, Cam);
